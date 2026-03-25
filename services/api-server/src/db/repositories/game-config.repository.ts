@@ -20,54 +20,65 @@ export class GameConfigRepository {
 
   setActive(record: Omit<GameConfigRecord, 'status' | 'updatedAt'> & { updatedAt?: number }): void {
     const now = record.updatedAt ?? Date.now();
-    this.database.sqlite
-      .prepare(
-        `
-          UPDATE game_config
-          SET status = 'archived', archived_at = ?, updated_at = ?
-          WHERE game_key = ? AND platform = ? AND status = 'active'
-        `
-      )
-      .run(now, now, record.gameKey, record.platform);
+    this.database.transaction(() => {
+      this.database.sqlite
+        .prepare(
+          `
+            UPDATE game_config
+            SET status = 'archived', archived_at = ?, updated_at = ?
+            WHERE game_key = ? AND platform = ? AND status = 'active'
+          `
+        )
+        .run(now, now, record.gameKey, record.platform);
 
-    this.database.sqlite
-      .prepare(
-        `
-          INSERT INTO game_config (
-            game_key,
-            platform,
-            config_version,
-            min_client_version,
-            max_client_version,
-            config_json,
-            status,
-            created_at,
-            published_at,
-            archived_at,
-            updated_at
-          ) VALUES (?, ?, ?, ?, ?, ?, 'active', ?, ?, NULL, ?)
-          ON CONFLICT(game_key, platform, config_version)
-          DO UPDATE SET
-            min_client_version = excluded.min_client_version,
-            max_client_version = excluded.max_client_version,
-            config_json = excluded.config_json,
-            status = 'active',
-            published_at = excluded.published_at,
-            archived_at = NULL,
-            updated_at = excluded.updated_at
-        `
-      )
-      .run(
-        record.gameKey,
-        record.platform,
-        record.configVersion,
-        record.minClientVersion ?? null,
-        record.maxClientVersion ?? null,
-        JSON.stringify(record.payload),
-        now,
-        now,
-        now
-      );
+      this.database.sqlite
+        .prepare(
+          `
+            INSERT INTO game_config (
+              game_key,
+              platform,
+              config_version,
+              min_client_version,
+              max_client_version,
+              config_json,
+              status,
+              created_at,
+              published_at,
+              archived_at,
+              updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, 'active', ?, ?, NULL, ?)
+            ON CONFLICT(game_key, platform, config_version)
+            DO UPDATE SET
+              min_client_version = excluded.min_client_version,
+              max_client_version = excluded.max_client_version,
+              config_json = excluded.config_json,
+              status = 'active',
+              published_at = excluded.published_at,
+              archived_at = NULL,
+              updated_at = excluded.updated_at
+          `
+        )
+        .run(
+          record.gameKey,
+          record.platform,
+          record.configVersion,
+          record.minClientVersion ?? null,
+          record.maxClientVersion ?? null,
+          JSON.stringify(record.payload),
+          now,
+          now,
+          now
+        );
+    });
+  }
+
+  ensureActive(record: Omit<GameConfigRecord, 'status' | 'updatedAt'> & { updatedAt?: number }): void {
+    const active = this.findActive(record.gameKey, record.platform);
+    if (active) {
+      return;
+    }
+
+    this.setActive(record);
   }
 
   findActive(gameKey: string, platform: string): GameConfigRecord | null {

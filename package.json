@@ -5,7 +5,11 @@
   "packageManager": "pnpm@10.7.0",
   "scripts": {
     "build": "pnpm -r run build",
-    "typecheck": "pnpm -r run typecheck"
+    "typecheck": "pnpm -r run typecheck",
+    "db:init": "node --experimental-specifier-resolution=node scripts/init-dev-db.mjs",
+    "verify:minimal": "node --experimental-specifier-resolution=node scripts/verify-minimal-flow.mjs",
+    "verify:admin": "node --experimental-specifier-resolution=node scripts/verify-admin-flow.mjs",
+    "verify:persistence": "node --experimental-specifier-resolution=node scripts/verify-persistence-flow.mjs"
   },
   "devDependencies": {
     "typescript": "^5.8.2"

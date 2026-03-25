@@ -2,7 +2,7 @@ import { decodeToken, type AuthClaims } from './common/auth.js';
 import { DEV_ADMIN_TOKEN } from './common/admin.js';
 import { errorCodes } from './common/errors.js';
 import { fail } from './common/response.js';
-import { createDatabaseConnection } from './db/connection.js';
+import { initializeDevelopmentDatabase } from './db/bootstrap.js';
 import { AdLogRepository } from './db/repositories/ad-log.repository.js';
 import { AnalyticsEventRepository } from './db/repositories/analytics-event.repository.js';
 import { GameConfigRepository } from './db/repositories/game-config.repository.js';
@@ -103,7 +103,7 @@ export interface CreateAppOptions {
 }
 
 export function createApp(options: CreateAppOptions = {}): ApiApp {
-  const database = createDatabaseConnection({
+  const database = initializeDevelopmentDatabase({
     filePath: options.database?.filePath
   });
   const analyticsEventRepository = new AnalyticsEventRepository(database);
@@ -114,30 +114,6 @@ export function createApp(options: CreateAppOptions = {}): ApiApp {
   const rewardLogRepository = new RewardLogRepository(database);
   const userAssetBalanceRepository = new UserAssetBalanceRepository(database);
   const userSaveRepository = new UserSaveRepository(database);
-
-  gameConfigRepository.setActive({
-    gameKey: 'game_sample',
-    platform: 'web',
-    configVersion: 'seed-web-v1',
-    minClientVersion: '0.1.0',
-    maxClientVersion: '0.9.99',
-    payload: {
-      ad: {
-        enabled: false
-      }
-    }
-  });
-
-  if (noticeRepository.list({ gameKey: 'game_sample' }).length === 0) {
-    noticeRepository.create({
-      gameKey: 'game_sample',
-      title: '欢迎来到样例游戏',
-      content: '这是一条用于联调公告链路的默认公告。',
-      status: 'active',
-      startTime: null,
-      endTime: null
-    });
-  }
 
   const adService = new AdService(adLogRepository);
   const adminService = new AdminService(
@@ -152,7 +128,7 @@ export function createApp(options: CreateAppOptions = {}): ApiApp {
   const authService = new AuthService(gameUserRepository);
   const configService = new ConfigService(gameConfigRepository);
   const noticeService = new NoticeService(noticeRepository);
-  const rewardService = new RewardService(rewardLogRepository, userAssetBalanceRepository, adLogRepository);
+  const rewardService = new RewardService(database, rewardLogRepository, userAssetBalanceRepository, adLogRepository);
   const saveService = new SaveService(userSaveRepository);
 
   return {

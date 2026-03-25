@@ -4,7 +4,7 @@
 
 现有脚本：
 
+- `init-dev-db`
 - `verify-minimal-flow`
 - `verify-admin-flow`
-
-后续还会继续补充持久化和数据库相关验证脚本。
+- `verify-persistence-flow`

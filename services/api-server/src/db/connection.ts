@@ -127,6 +127,7 @@ export interface DatabaseConnection {
   provider: 'sqlite';
   filePath: string;
   sqlite: DatabaseSync;
+  transaction<TValue>(callback: () => TValue): TValue;
   close(): void;
 }
 
@@ -148,6 +149,17 @@ export function createDatabaseConnection(options: DatabaseConnectionOptions = {}
     provider: 'sqlite',
     filePath,
     sqlite,
+    transaction<TValue>(callback: () => TValue): TValue {
+      sqlite.exec('BEGIN IMMEDIATE');
+      try {
+        const value = callback();
+        sqlite.exec('COMMIT');
+        return value;
+      } catch (error) {
+        sqlite.exec('ROLLBACK');
+        throw error;
+      }
+    },
     close(): void {
       sqlite.close();
     }

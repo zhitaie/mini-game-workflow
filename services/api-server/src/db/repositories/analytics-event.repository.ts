@@ -30,8 +30,7 @@ export class AnalyticsEventRepository {
       `
     );
 
-    this.database.sqlite.exec('BEGIN');
-    try {
+    this.database.transaction(() => {
       events.forEach((event) => {
         insert.run(
           event.gameKey,
@@ -42,11 +41,7 @@ export class AnalyticsEventRepository {
           event.createdAt
         );
       });
-      this.database.sqlite.exec('COMMIT');
-    } catch (error) {
-      this.database.sqlite.exec('ROLLBACK');
-      throw error;
-    }
+    });
   }
 
   list(): AnalyticsEventRecord[] {
