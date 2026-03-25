@@ -74,8 +74,6 @@ export async function bootstrapGameSample(options: BootstrapGameSampleOptions = 
   const network = createNetworkManager();
   const config = createConfigManager<SampleConfig>();
   const save = createSaveManager(saveDefinition);
-  const analytics = createAnalyticsManager();
-  const ad = createAdManager(platform);
   let token: string | undefined;
 
   network.init({
@@ -86,6 +84,8 @@ export async function bootstrapGameSample(options: BootstrapGameSampleOptions = 
     getToken: () => token,
     fetchImpl: options.fetchImpl
   });
+  const analytics = createAnalyticsManager(network);
+  const ad = createAdManager(platform);
 
   await config.init({
     loadLocal: async () => localConfig,

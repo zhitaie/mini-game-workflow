@@ -1,3 +1,5 @@
 import { AdService } from './ad.service.js';
 
-export const adController = new AdService();
+export function createAdController(service: AdService): AdService {
+  return service;
+}

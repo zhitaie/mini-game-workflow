@@ -5,3 +5,4 @@ export * from './config.js';
 export * from './analytics.js';
 export * from './ad.js';
 export * from './api.js';
+export * from './admin.js';

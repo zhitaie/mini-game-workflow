@@ -64,6 +64,73 @@ async function main(): Promise<void> {
     throw new Error(`Unexpected save data: ${JSON.stringify(roundTrip.save.data)}`);
   }
 
+  runtime.analytics.track({
+    eventName: 'verify_flow_ping',
+    eventData: {
+      phase: 'post-save'
+    }
+  });
+  await runtime.analytics.flush();
+
+  const adResult = await runtime.ad.showRewardedVideo('doubleCoinReward');
+  const verification = await runtime.network.request<{
+    verified: boolean;
+    verificationId: string;
+    sceneKey: string;
+    completed: boolean;
+  }>({
+    path: '/api/ad/verify',
+    method: 'POST',
+    requiresAuth: true,
+    body: {
+      sceneKey: adResult.sceneKey,
+      adType: adResult.adType,
+      platformResult: {
+        completed: adResult.completed
+      }
+    }
+  });
+
+  const reward = await runtime.network.request<{
+    bizId: string;
+    rewardType: string;
+    amount: number;
+    balanceAfter: number;
+    status: string;
+  }>({
+    path: '/api/reward/claim',
+    method: 'POST',
+    requiresAuth: true,
+    body: {
+      rewardType: 'gold',
+      amount: 100,
+      reason: 'reward_ad',
+      bizId: verification.verificationId
+    }
+  });
+
+  const rewardDuplicate = await runtime.network.request<{
+    bizId: string;
+    rewardType: string;
+    amount: number;
+    balanceAfter: number;
+    status: string;
+  }>({
+    path: '/api/reward/claim',
+    method: 'POST',
+    requiresAuth: true,
+    body: {
+      rewardType: 'gold',
+      amount: 100,
+      reason: 'reward_ad',
+      bizId: verification.verificationId
+    }
+  });
+
+  if (reward.balanceAfter !== 100 || rewardDuplicate.balanceAfter !== 100) {
+    throw new Error(`Unexpected reward balance: ${JSON.stringify({ reward, rewardDuplicate })}`);
+  }
+
   console.log(
     JSON.stringify(
       {
@@ -71,7 +138,10 @@ async function main(): Promise<void> {
         token: session.token,
         configVersion: runtime.config.getVersion(),
         adEnabled,
-        save: roundTrip.save
+        save: roundTrip.save,
+        verification,
+        reward,
+        rewardDuplicate
       },
       null,
       2

@@ -1,7 +1,8 @@
 import type { AnalyticsContext, AnalyticsEventInput } from '@mini-game-workflow/game-core-types';
 import type { AnalyticsManager } from './AnalyticsManager.js';
+import type { NetworkManager } from '../network/NetworkManager.js';
 
-export function createAnalyticsManager(): AnalyticsManager {
+export function createAnalyticsManager(network: NetworkManager): AnalyticsManager {
   let context: AnalyticsContext | null = null;
   const queue: AnalyticsEventInput[] = [];
 
@@ -30,7 +31,24 @@ export function createAnalyticsManager(): AnalyticsManager {
         throw new Error('AnalyticsManager has not been initialized.');
       }
 
-      queue.length = 0;
+      if (queue.length === 0) {
+        return;
+      }
+
+      const payload = queue.splice(0, queue.length);
+      await network.request({
+        path: '/api/analytics/events',
+        method: 'POST',
+        requiresAuth: true,
+        body: {
+          gameKey: context.gameKey,
+          platform: context.platform,
+          clientVersion: context.clientVersion,
+          sessionId: context.sessionId,
+          events: payload
+        }
+      });
+
     }
   };
 }

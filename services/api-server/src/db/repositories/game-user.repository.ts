@@ -6,6 +6,7 @@ export interface GameUserRecord {
   nickname: string;
   avatar: string;
   status: 'active';
+  createdAt: number;
   lastLoginAt: number;
 }
 
@@ -37,6 +38,7 @@ export class GameUserRepository {
       nickname: '',
       avatar: '',
       status: 'active',
+      createdAt: Date.now(),
       lastLoginAt: Date.now()
     };
 
@@ -46,5 +48,42 @@ export class GameUserRepository {
       record,
       isNewUser: true
     };
+  }
+
+  list(filters: {
+    gameKey?: string;
+    platform?: string;
+    platformOpenId?: string;
+    status?: GameUserRecord['status'];
+  } = {}): GameUserRecord[] {
+    return [...this.records.values()]
+      .filter((record) => {
+        if (filters.gameKey && record.gameKey !== filters.gameKey) {
+          return false;
+        }
+
+        if (filters.platform && record.platform !== filters.platform) {
+          return false;
+        }
+
+        if (filters.platformOpenId && record.platformOpenId !== filters.platformOpenId) {
+          return false;
+        }
+
+        if (filters.status && record.status !== filters.status) {
+          return false;
+        }
+
+        return true;
+      })
+      .sort((left, right) => right.id - left.id);
+  }
+
+  countCreatedSince(gameKey: string, since: number): number {
+    return this.list({ gameKey }).filter((record) => record.createdAt >= since).length;
+  }
+
+  countLoggedInSince(gameKey: string, since: number): number {
+    return this.list({ gameKey }).filter((record) => record.lastLoginAt >= since).length;
   }
 }

@@ -1,3 +1,5 @@
 import { AnalyticsService } from './analytics.service.js';
 
-export const analyticsController = new AnalyticsService();
+export function createAnalyticsController(service: AnalyticsService): AnalyticsService {
+  return service;
+}

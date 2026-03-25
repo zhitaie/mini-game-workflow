@@ -6,4 +6,3 @@ export interface AnalyticsManager {
   track(event: AnalyticsEventInput): void;
   flush(): Promise<void>;
 }
-

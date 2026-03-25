@@ -24,4 +24,28 @@ export class GameConfigRepository {
   findActive(gameKey: string, platform: string): GameConfigRecord | null {
     return this.records.get(`${gameKey}:${platform}`) ?? null;
   }
+
+  list(filters: {
+    gameKey?: string;
+    platform?: string;
+    status?: GameConfigRecord['status'];
+  } = {}): GameConfigRecord[] {
+    return [...this.records.values()]
+      .filter((record) => {
+        if (filters.gameKey && record.gameKey !== filters.gameKey) {
+          return false;
+        }
+
+        if (filters.platform && record.platform !== filters.platform) {
+          return false;
+        }
+
+        if (filters.status && record.status !== filters.status) {
+          return false;
+        }
+
+        return true;
+      })
+      .sort((left, right) => right.updatedAt - left.updatedAt);
+  }
 }
