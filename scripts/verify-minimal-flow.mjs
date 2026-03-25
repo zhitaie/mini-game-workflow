@@ -1,7 +1,12 @@
 import { bootstrapGameSample } from '../apps/game-sample/client/dist/apps/game-sample/client/src/bootstrap.js';
 import { createApp } from '../services/api-server/dist/services/api-server/src/app.js';
 
-const app = createApp();
+const databaseFilePath = `/tmp/mini-game-workflow-minimal-${Date.now()}-${Math.random().toString(36).slice(2)}.sqlite`;
+const app = createApp({
+  database: {
+    filePath: databaseFilePath
+  }
+});
 const { runtime, session } = await bootstrapGameSample({
   baseURL: 'http://local.app',
   fetchImpl: app.fetch
@@ -98,6 +103,7 @@ if (reward.balanceAfter !== 100 || rewardDuplicate.balanceAfter !== 100) {
 console.log(
   JSON.stringify(
     {
+      databaseFilePath,
       userId: session.user.id,
       token: session.token,
       configVersion: runtime.config.getVersion(),
@@ -111,3 +117,5 @@ console.log(
     2
   )
 );
+
+app.close();

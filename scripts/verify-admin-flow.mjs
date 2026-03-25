@@ -9,7 +9,12 @@ import { fetchNotices } from '../services/admin-web/dist/services/admin-web/src/
 import { fetchRewardLogs } from '../services/admin-web/dist/services/admin-web/src/services/reward-logs.js';
 import { fetchUsers } from '../services/admin-web/dist/services/admin-web/src/services/users.js';
 
-const app = createApp();
+const databaseFilePath = `/tmp/mini-game-workflow-admin-${Date.now()}-${Math.random().toString(36).slice(2)}.sqlite`;
+const app = createApp({
+  database: {
+    filePath: databaseFilePath
+  }
+});
 initAdminApiClient({
   baseURL: 'http://local.app',
   adminToken: 'dev-admin-token',
@@ -96,6 +101,7 @@ if (adLogs.total !== 1 || rewardLogs.total !== 1 || analytics.total !== 1) {
 console.log(
   JSON.stringify(
     {
+      databaseFilePath,
       dashboard,
       user: users.items[0],
       config: configs.items[0],
@@ -108,3 +114,5 @@ console.log(
     2
   )
 );
+
+app.close();

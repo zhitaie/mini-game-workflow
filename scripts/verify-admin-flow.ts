@@ -10,7 +10,12 @@ import { fetchRewardLogs } from '../services/admin-web/src/services/reward-logs'
 import { fetchUsers } from '../services/admin-web/src/services/users';
 
 async function main(): Promise<void> {
-  const app = createApp();
+  const databaseFilePath = `/tmp/mini-game-workflow-admin-${Date.now()}-${Math.random().toString(36).slice(2)}.sqlite`;
+  const app = createApp({
+    database: {
+      filePath: databaseFilePath
+    }
+  });
   initAdminApiClient({
     baseURL: 'http://local.app',
     adminToken: 'dev-admin-token',
@@ -99,6 +104,7 @@ async function main(): Promise<void> {
   console.log(
     JSON.stringify(
       {
+        databaseFilePath,
         dashboard,
         user: users.items[0],
         config: configs.items[0],
@@ -111,6 +117,8 @@ async function main(): Promise<void> {
       2
     )
   );
+
+  app.close();
 }
 
 void main();

@@ -2,7 +2,12 @@ import { bootstrapGameSample } from '../apps/game-sample/client/src/bootstrap';
 import { createApp } from '../services/api-server/src/app';
 
 async function main(): Promise<void> {
-  const app = createApp();
+  const databaseFilePath = `/tmp/mini-game-workflow-minimal-${Date.now()}-${Math.random().toString(36).slice(2)}.sqlite`;
+  const app = createApp({
+    database: {
+      filePath: databaseFilePath
+    }
+  });
   const { runtime, session } = await bootstrapGameSample({
     baseURL: 'http://local.app',
     fetchImpl: app.fetch
@@ -134,6 +139,7 @@ async function main(): Promise<void> {
   console.log(
     JSON.stringify(
       {
+        databaseFilePath,
         userId: session.user.id,
         token: session.token,
         configVersion: runtime.config.getVersion(),
@@ -147,6 +153,8 @@ async function main(): Promise<void> {
       2
     )
   );
+
+  app.close();
 }
 
 void main();

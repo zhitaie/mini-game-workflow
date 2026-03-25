@@ -2,6 +2,7 @@ import { decodeToken, type AuthClaims } from './common/auth.js';
 import { DEV_ADMIN_TOKEN } from './common/admin.js';
 import { errorCodes } from './common/errors.js';
 import { fail } from './common/response.js';
+import { createDatabaseConnection } from './db/connection.js';
 import { AdLogRepository } from './db/repositories/ad-log.repository.js';
 import { AnalyticsEventRepository } from './db/repositories/analytics-event.repository.js';
 import { GameConfigRepository } from './db/repositories/game-config.repository.js';
@@ -90,18 +91,29 @@ function parseBody(init?: RequestInit): Record<string, unknown> {
 
 export interface ApiApp {
   name: string;
+  databaseFilePath: string;
   fetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response>;
+  close(): void;
 }
 
-export function createApp(): ApiApp {
-  const analyticsEventRepository = new AnalyticsEventRepository();
-  const adLogRepository = new AdLogRepository();
-  const gameUserRepository = new GameUserRepository();
-  const gameConfigRepository = new GameConfigRepository();
-  const noticeRepository = new NoticeRepository();
-  const rewardLogRepository = new RewardLogRepository();
-  const userAssetBalanceRepository = new UserAssetBalanceRepository();
-  const userSaveRepository = new UserSaveRepository();
+export interface CreateAppOptions {
+  database?: {
+    filePath?: string;
+  };
+}
+
+export function createApp(options: CreateAppOptions = {}): ApiApp {
+  const database = createDatabaseConnection({
+    filePath: options.database?.filePath
+  });
+  const analyticsEventRepository = new AnalyticsEventRepository(database);
+  const adLogRepository = new AdLogRepository(database);
+  const gameUserRepository = new GameUserRepository(database);
+  const gameConfigRepository = new GameConfigRepository(database);
+  const noticeRepository = new NoticeRepository(database);
+  const rewardLogRepository = new RewardLogRepository(database);
+  const userAssetBalanceRepository = new UserAssetBalanceRepository(database);
+  const userSaveRepository = new UserSaveRepository(database);
 
   gameConfigRepository.setActive({
     gameKey: 'game_sample',
@@ -116,14 +128,16 @@ export function createApp(): ApiApp {
     }
   });
 
-  noticeRepository.create({
-    gameKey: 'game_sample',
-    title: '欢迎来到样例游戏',
-    content: '这是一条用于联调公告链路的默认公告。',
-    status: 'active',
-    startTime: null,
-    endTime: null
-  });
+  if (noticeRepository.list({ gameKey: 'game_sample' }).length === 0) {
+    noticeRepository.create({
+      gameKey: 'game_sample',
+      title: '欢迎来到样例游戏',
+      content: '这是一条用于联调公告链路的默认公告。',
+      status: 'active',
+      startTime: null,
+      endTime: null
+    });
+  }
 
   const adService = new AdService(adLogRepository);
   const adminService = new AdminService(
@@ -143,6 +157,7 @@ export function createApp(): ApiApp {
 
   return {
     name: 'api-server',
+    databaseFilePath: database.filePath,
     async fetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
       try {
         const rawUrl =
@@ -333,6 +348,9 @@ export function createApp(): ApiApp {
         const message = error instanceof Error ? error.message : 'internal error';
         return json(fail('INTERNAL_ERROR', message), 500);
       }
+    },
+    close(): void {
+      database.close();
     }
   };
 }
