@@ -1,0 +1,23 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Node",
+    "lib": ["ES2022", "DOM"],
+    "strict": true,
+    "noEmitOnError": true,
+    "declaration": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "baseUrl": ".",
+    "paths": {
+      "@mini-game-workflow/game-core-types": [
+        "packages/game-core-types/src/index.ts"
+      ],
+      "@mini-game-workflow/game-core-client": [
+        "packages/game-core-client/src/index.ts"
+      ]
+    }
+  }
+}
