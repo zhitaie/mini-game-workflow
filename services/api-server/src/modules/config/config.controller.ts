@@ -1,4 +1,5 @@
-import { ConfigService } from './config.service';
+import { ConfigService } from './config.service.js';
 
-export const configController = new ConfigService();
-
+export function createConfigController(service: ConfigService): ConfigService {
+  return service;
+}

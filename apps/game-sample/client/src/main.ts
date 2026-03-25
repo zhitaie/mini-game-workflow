@@ -1,4 +1,3 @@
-import { bootstrapGameSample } from './bootstrap';
+import { bootstrapGameSample } from './bootstrap.js';
 
 void bootstrapGameSample();
-

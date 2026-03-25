@@ -3,6 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "main": "./dist/game-core-client/src/index.js",
+  "exports": "./dist/game-core-client/src/index.js",
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc --noEmit -p tsconfig.json"
@@ -11,4 +13,3 @@
     "@mini-game-workflow/game-core-types": "workspace:*"
   }
 }
-

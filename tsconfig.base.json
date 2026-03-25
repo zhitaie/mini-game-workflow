@@ -1,9 +1,9 @@
 {
   "compilerOptions": {
-    "target": "ES2022",
+    "target": "es2021",
     "module": "ESNext",
     "moduleResolution": "Node",
-    "lib": ["ES2022", "DOM"],
+    "lib": ["es2021", "dom"],
     "strict": true,
     "noEmitOnError": true,
     "declaration": true,

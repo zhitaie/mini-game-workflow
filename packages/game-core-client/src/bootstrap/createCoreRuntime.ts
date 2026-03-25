@@ -1,10 +1,10 @@
 import type { GameConfig } from '@mini-game-workflow/game-core-types';
-import type { PlatformAdapter } from '../platform/PlatformAdapter';
-import type { NetworkManager } from '../network/NetworkManager';
-import type { ConfigManager } from '../config/ConfigManager';
-import type { SaveManager } from '../save/SaveManager';
-import type { AnalyticsManager } from '../analytics/AnalyticsManager';
-import type { AdManager } from '../ad/AdManager';
+import type { PlatformAdapter } from '../platform/PlatformAdapter.js';
+import type { NetworkManager } from '../network/NetworkManager.js';
+import type { ConfigManager } from '../config/ConfigManager.js';
+import type { SaveManager } from '../save/SaveManager.js';
+import type { AnalyticsManager } from '../analytics/AnalyticsManager.js';
+import type { AdManager } from '../ad/AdManager.js';
 
 export interface CoreRuntime<TConfig = unknown, TSave = unknown> {
   gameConfig: GameConfig;

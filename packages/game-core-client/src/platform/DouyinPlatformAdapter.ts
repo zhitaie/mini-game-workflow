@@ -1,4 +1,4 @@
-import type { PlatformAdapter, PlatformLoginResult } from './PlatformAdapter';
+import type { PlatformAdapter, PlatformLoginResult } from './PlatformAdapter.js';
 
 export class DouyinPlatformAdapter implements PlatformAdapter {
   getPlatform(): string {
@@ -9,4 +9,3 @@ export class DouyinPlatformAdapter implements PlatformAdapter {
     throw new Error('DouyinPlatformAdapter is not implemented yet.');
   }
 }
-

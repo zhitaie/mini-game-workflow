@@ -4,6 +4,7 @@ export interface NetworkContext {
   platform: string;
   clientVersion: string;
   getToken?: () => string | undefined;
+  fetchImpl?: typeof fetch;
 }
 
 export interface NetworkRequestOptions {
@@ -15,4 +16,3 @@ export interface NetworkRequestOptions {
   requiresAuth?: boolean;
   timeoutMs?: number;
 }
-

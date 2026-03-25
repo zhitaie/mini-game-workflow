@@ -1,4 +1,4 @@
-import type { PlatformAdHandle, PlatformAdapter, PlatformLoginResult } from './PlatformAdapter';
+import type { PlatformAdHandle, PlatformAdapter, PlatformLoginResult } from './PlatformAdapter.js';
 
 class MockRewardedAd implements PlatformAdHandle {
   async show(): Promise<boolean> {
@@ -23,4 +23,3 @@ export class WebMockPlatformAdapter implements PlatformAdapter {
     };
   }
 }
-

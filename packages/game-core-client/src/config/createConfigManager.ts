@@ -1,4 +1,4 @@
-import type { ConfigManager, ConfigSource } from './ConfigManager';
+import type { ConfigManager, ConfigSource } from './ConfigManager.js';
 import type { RemoteConfigRequestContext } from '@mini-game-workflow/game-core-types';
 
 export function createConfigManager<TConfig>(): ConfigManager<TConfig> {
@@ -40,4 +40,3 @@ export function createConfigManager<TConfig>(): ConfigManager<TConfig> {
     }
   };
 }
-

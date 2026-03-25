@@ -1,4 +1,4 @@
-import { ok } from '../../common/response';
+import { ok } from '../../common/response.js';
 
 export class AnalyticsService {
   accept(events: unknown[]) {
@@ -7,4 +7,3 @@ export class AnalyticsService {
     });
   }
 }
-

@@ -1,4 +1,4 @@
-import { ok } from '../../common/response';
+import { ok } from '../../common/response.js';
 
 export class AdService {
   verify(sceneKey: string) {
@@ -10,4 +10,3 @@ export class AdService {
     });
   }
 }
-

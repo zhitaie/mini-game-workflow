@@ -1,4 +1,4 @@
-import { ok } from '../../common/response';
+import { ok } from '../../common/response.js';
 
 export class RewardService {
   claim(rewardType: string, amount: number, bizId: string) {
@@ -11,4 +11,3 @@ export class RewardService {
     });
   }
 }
-

@@ -1,5 +1,5 @@
-import type { AdManager } from './AdManager';
-import type { PlatformAdapter } from '../platform/PlatformAdapter';
+import type { AdManager } from './AdManager.js';
+import type { PlatformAdapter } from '../platform/PlatformAdapter.js';
 
 export function createAdManager(platform: PlatformAdapter): AdManager {
   return {
@@ -19,4 +19,3 @@ export function createAdManager(platform: PlatformAdapter): AdManager {
     }
   };
 }
-

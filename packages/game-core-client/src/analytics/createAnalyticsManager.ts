@@ -1,5 +1,5 @@
 import type { AnalyticsContext, AnalyticsEventInput } from '@mini-game-workflow/game-core-types';
-import type { AnalyticsManager } from './AnalyticsManager';
+import type { AnalyticsManager } from './AnalyticsManager.js';
 
 export function createAnalyticsManager(): AnalyticsManager {
   let context: AnalyticsContext | null = null;
@@ -34,4 +34,3 @@ export function createAnalyticsManager(): AnalyticsManager {
     }
   };
 }
-

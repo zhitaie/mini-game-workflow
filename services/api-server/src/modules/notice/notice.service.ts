@@ -1,4 +1,4 @@
-import { ok } from '../../common/response';
+import { ok } from '../../common/response.js';
 
 export class NoticeService {
   list(gameKey: string) {
@@ -8,4 +8,3 @@ export class NoticeService {
     });
   }
 }
-

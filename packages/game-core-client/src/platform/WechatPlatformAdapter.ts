@@ -1,4 +1,4 @@
-import type { PlatformAdapter, PlatformLoginResult } from './PlatformAdapter';
+import type { PlatformAdapter, PlatformLoginResult } from './PlatformAdapter.js';
 
 export class WechatPlatformAdapter implements PlatformAdapter {
   getPlatform(): string {
@@ -9,4 +9,3 @@ export class WechatPlatformAdapter implements PlatformAdapter {
     throw new Error('WechatPlatformAdapter is not implemented yet.');
   }
 }
-

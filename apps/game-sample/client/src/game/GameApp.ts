@@ -1,7 +1,11 @@
 import type { CoreRuntime } from '@mini-game-workflow/game-core-client';
 
 export class GameApp {
-  constructor(private readonly runtime: CoreRuntime) {}
+  private readonly runtime: CoreRuntime;
+
+  constructor(runtime: CoreRuntime) {
+    this.runtime = runtime;
+  }
 
   async start(): Promise<void> {
     this.runtime.analytics.track({
@@ -14,4 +18,3 @@ export class GameApp {
     await this.runtime.analytics.flush();
   }
 }
-

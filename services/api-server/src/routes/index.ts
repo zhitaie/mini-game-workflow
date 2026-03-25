@@ -1,8 +1,7 @@
-export * from './auth';
-export * from './config';
-export * from './save';
-export * from './notice';
-export * from './ad';
-export * from './reward';
-export * from './analytics';
-
+export * from './auth.js';
+export * from './config.js';
+export * from './save.js';
+export * from './notice.js';
+export * from './ad.js';
+export * from './reward.js';
+export * from './analytics.js';

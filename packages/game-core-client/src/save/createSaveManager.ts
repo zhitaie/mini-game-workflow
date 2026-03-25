@@ -1,5 +1,5 @@
 import type { SaveDefinition, SaveEnvelope } from '@mini-game-workflow/game-core-types';
-import type { SaveManager } from './SaveManager';
+import type { SaveManager } from './SaveManager.js';
 
 export function createSaveManager<TData>(definition: SaveDefinition<TData>): SaveManager<TData> {
   let save: SaveEnvelope<TData> | null = null;
@@ -30,4 +30,3 @@ export function createSaveManager<TData>(definition: SaveDefinition<TData>): Sav
     }
   };
 }
-

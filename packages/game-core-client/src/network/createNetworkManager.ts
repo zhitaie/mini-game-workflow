@@ -1,5 +1,5 @@
 import type { ApiResponse, NetworkContext, NetworkRequestOptions } from '@mini-game-workflow/game-core-types';
-import { NetworkBusinessError, type NetworkManager } from './NetworkManager';
+import { NetworkBusinessError, type NetworkManager } from './NetworkManager.js';
 
 function buildURL(baseURL: string, path: string, query?: Record<string, string | number | boolean | undefined>): string {
   const url = new URL(path, baseURL);
@@ -40,7 +40,8 @@ export function createNetworkManager(): NetworkManager {
         headers.Authorization = `Bearer ${token}`;
       }
 
-      const response = await fetch(buildURL(context.baseURL, options.path, options.query), {
+      const fetchImpl = context.fetchImpl ?? fetch;
+      const response = await fetchImpl(buildURL(context.baseURL, options.path, options.query), {
         method: options.method,
         headers,
         body: options.body === undefined ? undefined : JSON.stringify(options.body)
@@ -56,4 +57,3 @@ export function createNetworkManager(): NetworkManager {
     }
   };
 }
-
