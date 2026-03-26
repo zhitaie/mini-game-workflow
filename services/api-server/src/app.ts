@@ -1,9 +1,13 @@
+import type { AdminPermissionCode } from '@mini-game-workflow/game-core-types';
 import { decodeToken, type AuthClaims } from './common/auth.js';
-import { DEV_ADMIN_TOKEN } from './common/admin.js';
+import { hasAdminPermission, type AdminActor } from './common/admin.js';
 import { errorCodes } from './common/errors.js';
 import { fail } from './common/response.js';
 import { initializeDevelopmentDatabase } from './db/bootstrap.js';
 import { AdLogRepository } from './db/repositories/ad-log.repository.js';
+import { AdminAuditLogRepository } from './db/repositories/admin-audit-log.repository.js';
+import { AdminSessionRepository } from './db/repositories/admin-session.repository.js';
+import { AdminUserRepository } from './db/repositories/admin-user.repository.js';
 import { AnalyticsEventRepository } from './db/repositories/analytics-event.repository.js';
 import { GameConfigRepository } from './db/repositories/game-config.repository.js';
 import { GameUserRepository } from './db/repositories/game-user.repository.js';
@@ -13,6 +17,7 @@ import { UserAssetBalanceRepository } from './db/repositories/user-asset-balance
 import { UserSaveRepository } from './db/repositories/user-save.repository.js';
 import { AdService } from './modules/ad/ad.service.js';
 import { AdminService } from './modules/admin/admin.service.js';
+import { AdminAuthService } from './modules/admin-auth/admin-auth.service.js';
 import { AnalyticsService } from './modules/analytics/analytics.service.js';
 import { AuthService } from './modules/auth/auth.service.js';
 import { ConfigService } from './modules/config/config.service.js';
@@ -36,6 +41,21 @@ function json(data: unknown, status = 200): Response {
       'Content-Type': 'application/json'
     }
   });
+}
+
+function statusForErrorCode(code: string): number {
+  switch (code) {
+    case errorCodes.UNAUTHORIZED:
+      return 401;
+    case errorCodes.FORBIDDEN:
+      return 403;
+    case 'NOT_FOUND':
+      return 404;
+    case 'CONFLICT':
+      return 409;
+    default:
+      return 400;
+  }
 }
 
 function readToken(headers: HeadersInit | undefined): string | null {
@@ -80,13 +100,19 @@ function optionalAuth(headers: HeadersInit | undefined): AuthClaims | null {
   }
 }
 
-function requireAdmin(headers: HeadersInit | undefined): void {
+function readAdminToken(headers: HeadersInit | undefined): string | null {
   const normalized = new Headers(headers);
-  const token = normalized.get('x-admin-token');
-
-  if (token !== DEV_ADMIN_TOKEN) {
-    throw new AppError(errorCodes.FORBIDDEN, 'invalid admin token');
+  const headerToken = normalized.get('x-admin-token');
+  if (headerToken) {
+    return headerToken;
   }
+
+  const authorization = normalized.get('Authorization');
+  if (!authorization) {
+    return null;
+  }
+
+  return authorization.replace(/^Bearer\s+/u, '');
 }
 
 function parseBody(init?: RequestInit): Record<string, unknown> {
@@ -216,6 +242,9 @@ export function createApp(options: CreateAppOptions = {}): ApiApp {
   const database = initializeDevelopmentDatabase({
     filePath: options.database?.filePath
   });
+  const adminAuditLogRepository = new AdminAuditLogRepository(database);
+  const adminSessionRepository = new AdminSessionRepository(database);
+  const adminUserRepository = new AdminUserRepository(database);
   const analyticsEventRepository = new AnalyticsEventRepository(database);
   const adLogRepository = new AdLogRepository(database);
   const gameUserRepository = new GameUserRepository(database);
@@ -226,13 +255,15 @@ export function createApp(options: CreateAppOptions = {}): ApiApp {
   const userSaveRepository = new UserSaveRepository(database);
 
   const adService = new AdService(adLogRepository);
+  const adminAuthService = new AdminAuthService(adminUserRepository, adminSessionRepository);
   const adminService = new AdminService(
     gameUserRepository,
     gameConfigRepository,
     noticeRepository,
     adLogRepository,
     rewardLogRepository,
-    analyticsEventRepository
+    analyticsEventRepository,
+    adminAuditLogRepository
   );
   const analyticsService = new AnalyticsService(analyticsEventRepository);
   const authService = new AuthService(gameUserRepository);
@@ -260,6 +291,35 @@ export function createApp(options: CreateAppOptions = {}): ApiApp {
     return claims ? validateClaims(claims) : null;
   };
 
+  const requireAdminActor = (headers: HeadersInit | undefined, permission: AdminPermissionCode): AdminActor => {
+    const token = readAdminToken(headers);
+
+    if (!token) {
+      throw new AppError(errorCodes.UNAUTHORIZED, 'missing admin token');
+    }
+
+    const session = adminAuthService.getSession(token);
+
+    if (!session) {
+      throw new AppError(errorCodes.UNAUTHORIZED, 'invalid admin session');
+    }
+
+    if (!hasAdminPermission(session.permissions, permission)) {
+      throw new AppError(errorCodes.FORBIDDEN, `missing permission: ${permission}`);
+    }
+
+    return {
+      sessionId: session.id,
+      adminUserId: session.adminUserId,
+      username: session.username,
+      displayName: session.displayName,
+      roleCode: session.roleCode,
+      roleName: session.roleName,
+      permissions: session.permissions,
+      expiresAt: session.expiresAt
+    };
+  };
+
   return {
     name: 'api-server',
     databaseFilePath: database.filePath,
@@ -285,6 +345,46 @@ export function createApp(options: CreateAppOptions = {}): ApiApp {
               clientVersion: String(body.clientVersion ?? '')
             })
           );
+        }
+
+        if (url.pathname === '/api/admin/auth/login' && method === 'POST') {
+          const body = parseBody(init);
+          const response = adminAuthService.login({
+            username: readRequiredString(body, 'username'),
+            password: readRequiredString(body, 'password')
+          });
+
+          if (!response) {
+            throw new AppError(errorCodes.UNAUTHORIZED, 'invalid admin credentials');
+          }
+
+          return json(response);
+        }
+
+        if (url.pathname === '/api/admin/auth/me' && method === 'GET') {
+          const token = readAdminToken(init?.headers);
+
+          if (!token) {
+            throw new AppError(errorCodes.UNAUTHORIZED, 'missing admin token');
+          }
+
+          const response = adminAuthService.getMe(token);
+
+          if (!response) {
+            throw new AppError(errorCodes.UNAUTHORIZED, 'invalid admin session');
+          }
+
+          return json(response);
+        }
+
+        if (url.pathname === '/api/admin/auth/logout' && method === 'POST') {
+          const token = readAdminToken(init?.headers);
+
+          if (!token) {
+            throw new AppError(errorCodes.UNAUTHORIZED, 'missing admin token');
+          }
+
+          return json(adminAuthService.logout(token));
         }
 
         if (url.pathname === '/api/config' && method === 'GET') {
@@ -366,12 +466,12 @@ export function createApp(options: CreateAppOptions = {}): ApiApp {
         }
 
         if (url.pathname === '/api/admin/dashboard' && method === 'GET') {
-          requireAdmin(init?.headers);
+          requireAdminActor(init?.headers, 'dashboard.read');
           return json(adminService.getDashboardSummary(String(url.searchParams.get('gameKey') ?? '')));
         }
 
         if (url.pathname === '/api/admin/users' && method === 'GET') {
-          requireAdmin(init?.headers);
+          requireAdminActor(init?.headers, 'users.read');
           return json(
             adminService.listUsers({
               gameKey: url.searchParams.get('gameKey') ?? undefined,
@@ -383,7 +483,7 @@ export function createApp(options: CreateAppOptions = {}): ApiApp {
         }
 
         if (url.pathname === '/api/admin/configs' && method === 'GET') {
-          requireAdmin(init?.headers);
+          requireAdminActor(init?.headers, 'configs.read');
           return json(
             adminService.listConfigs({
               gameKey: url.searchParams.get('gameKey') ?? undefined,
@@ -394,9 +494,10 @@ export function createApp(options: CreateAppOptions = {}): ApiApp {
         }
 
         if (url.pathname === '/api/admin/configs/draft' && method === 'POST') {
-          requireAdmin(init?.headers);
+          const actor = requireAdminActor(init?.headers, 'configs.write');
           const body = parseBody(init);
           const response = adminService.saveConfigDraft({
+            actor,
             gameKey: readRequiredString(body, 'gameKey'),
             platform: readRequiredString(body, 'platform'),
             configVersion: readRequiredString(body, 'configVersion'),
@@ -413,9 +514,10 @@ export function createApp(options: CreateAppOptions = {}): ApiApp {
         }
 
         if (url.pathname === '/api/admin/configs/publish' && method === 'POST') {
-          requireAdmin(init?.headers);
+          const actor = requireAdminActor(init?.headers, 'configs.publish');
           const body = parseBody(init);
           const response = adminService.publishConfig({
+            actor,
             gameKey: readRequiredString(body, 'gameKey'),
             platform: readRequiredString(body, 'platform'),
             configVersion: readRequiredString(body, 'configVersion')
@@ -429,9 +531,10 @@ export function createApp(options: CreateAppOptions = {}): ApiApp {
         }
 
         if (url.pathname === '/api/admin/configs/archive' && method === 'POST') {
-          requireAdmin(init?.headers);
+          const actor = requireAdminActor(init?.headers, 'configs.publish');
           const body = parseBody(init);
           const response = adminService.archiveConfig({
+            actor,
             gameKey: readRequiredString(body, 'gameKey'),
             platform: readRequiredString(body, 'platform'),
             configVersion: readRequiredString(body, 'configVersion')
@@ -445,7 +548,7 @@ export function createApp(options: CreateAppOptions = {}): ApiApp {
         }
 
         if (url.pathname === '/api/admin/notices' && method === 'GET') {
-          requireAdmin(init?.headers);
+          requireAdminActor(init?.headers, 'notices.read');
           return json(
             adminService.listNotices({
               gameKey: url.searchParams.get('gameKey') ?? undefined,
@@ -455,9 +558,10 @@ export function createApp(options: CreateAppOptions = {}): ApiApp {
         }
 
         if (url.pathname === '/api/admin/notices/save' && method === 'POST') {
-          requireAdmin(init?.headers);
+          const actor = requireAdminActor(init?.headers, 'notices.write');
           const body = parseBody(init);
           const response = adminService.saveNotice({
+            actor,
             id: readOptionalNumber(body, 'id'),
             gameKey: readRequiredString(body, 'gameKey'),
             title: readRequiredString(body, 'title'),
@@ -475,9 +579,10 @@ export function createApp(options: CreateAppOptions = {}): ApiApp {
         }
 
         if (url.pathname === '/api/admin/notices/status' && method === 'POST') {
-          requireAdmin(init?.headers);
+          const actor = requireAdminActor(init?.headers, 'notices.write');
           const body = parseBody(init);
           const response = adminService.setNoticeStatus({
+            actor,
             gameKey: readRequiredString(body, 'gameKey'),
             id: readRequiredNumber(body, 'id'),
             status: readConfigStatus(body, 'status')
@@ -491,7 +596,7 @@ export function createApp(options: CreateAppOptions = {}): ApiApp {
         }
 
         if (url.pathname === '/api/admin/ad-logs' && method === 'GET') {
-          requireAdmin(init?.headers);
+          requireAdminActor(init?.headers, 'logs.read');
           return json(
             adminService.listAdLogs({
               gameKey: url.searchParams.get('gameKey') ?? undefined,
@@ -504,7 +609,7 @@ export function createApp(options: CreateAppOptions = {}): ApiApp {
         }
 
         if (url.pathname === '/api/admin/reward-logs' && method === 'GET') {
-          requireAdmin(init?.headers);
+          requireAdminActor(init?.headers, 'logs.read');
           return json(
             adminService.listRewardLogs({
               gameKey: url.searchParams.get('gameKey') ?? undefined,
@@ -517,7 +622,7 @@ export function createApp(options: CreateAppOptions = {}): ApiApp {
         }
 
         if (url.pathname === '/api/admin/analytics' && method === 'GET') {
-          requireAdmin(init?.headers);
+          requireAdminActor(init?.headers, 'logs.read');
           return json(
             adminService.listAnalyticsEvents({
               gameKey: url.searchParams.get('gameKey') ?? undefined,
@@ -527,10 +632,22 @@ export function createApp(options: CreateAppOptions = {}): ApiApp {
           );
         }
 
+        if (url.pathname === '/api/admin/audit-logs' && method === 'GET') {
+          requireAdminActor(init?.headers, 'audit.read');
+          return json(
+            adminService.listAuditLogs({
+              gameKey: url.searchParams.get('gameKey') ?? undefined,
+              adminUserId: url.searchParams.get('adminUserId') ? Number(url.searchParams.get('adminUserId')) : undefined,
+              action: url.searchParams.get('action') ?? undefined,
+              targetType: url.searchParams.get('targetType') ?? undefined
+            })
+          );
+        }
+
         return json(fail(errorCodes.BAD_REQUEST, `unsupported route: ${method} ${url.pathname}`), 400);
       } catch (error) {
         if (error instanceof AppError) {
-          return json(fail(error.code, error.message), 400);
+          return json(fail(error.code, error.message), statusForErrorCode(error.code));
         }
 
         if (error instanceof Error && error.message.startsWith('Invalid verification id')) {

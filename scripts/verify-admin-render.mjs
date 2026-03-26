@@ -1,4 +1,5 @@
 import { bootstrapGameSample } from '../apps/game-sample/client/dist/apps/game-sample/client/src/bootstrap.js';
+import { loginAdmin } from './lib/admin-auth.mjs';
 import { createApp } from '../services/api-server/dist/services/api-server/src/app.js';
 import { bootstrapAndRenderAdminApp } from '../services/admin-web/dist/services/admin-web/src/main.js';
 
@@ -13,6 +14,10 @@ await bootstrapGameSample({
   baseURL: 'http://local.app',
   fetchImpl: app.fetch
 });
+const adminLogin = await loginAdmin({
+  baseURL: 'http://local.app',
+  fetchImpl: app.fetch
+});
 
 const target = {
   innerHTML: ''
@@ -20,7 +25,7 @@ const target = {
 
 const rendered = await bootstrapAndRenderAdminApp({
   baseURL: 'http://local.app',
-  adminToken: 'dev-admin-token',
+  adminToken: adminLogin.session.token,
   fetchImpl: app.fetch,
   gameKey: 'game_sample',
   route: '/users',

@@ -2,7 +2,7 @@ import type { ApiResponse } from '@mini-game-workflow/game-core-types';
 
 export interface AdminApiClientContext {
   baseURL: string;
-  adminToken: string;
+  adminToken?: string;
   fetchImpl?: typeof fetch;
 }
 
@@ -10,6 +10,7 @@ export interface AdminRequestOptions {
   method?: 'GET' | 'POST';
   query?: object;
   body?: unknown;
+  requiresAuth?: boolean;
 }
 
 let context: AdminApiClientContext | null = null;
@@ -32,18 +33,38 @@ export function initAdminApiClient(nextContext: AdminApiClientContext): void {
   context = nextContext;
 }
 
+export function setAdminApiClientToken(adminToken: string | undefined): void {
+  if (!context) {
+    throw new Error('Admin API client is not initialized.');
+  }
+
+  context = {
+    ...context,
+    adminToken
+  };
+}
+
 export async function request<TData>(path: string, options: AdminRequestOptions = {}): Promise<TData> {
   if (!context) {
     throw new Error('Admin API client is not initialized.');
   }
 
+  if (options.requiresAuth !== false && !context.adminToken) {
+    throw new Error('Admin session token is missing.');
+  }
+
   const fetchImpl = context.fetchImpl ?? fetch;
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json'
+  };
+
+  if (context.adminToken) {
+    headers['x-admin-token'] = context.adminToken;
+  }
+
   const response = await fetchImpl(buildURL(context.baseURL, path, options.query), {
     method: options.method ?? 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-admin-token': context.adminToken
-    },
+    headers,
     body: options.body === undefined ? undefined : JSON.stringify(options.body)
   });
 

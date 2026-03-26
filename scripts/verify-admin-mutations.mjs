@@ -1,6 +1,7 @@
 import { createApp } from '../services/api-server/dist/services/api-server/src/app.js';
 import { bootstrapAndRenderAdminApp } from '../services/admin-web/dist/services/admin-web/src/main.js';
 import { initAdminApiClient } from '../services/admin-web/dist/services/admin-web/src/services/api-client.js';
+import { loginAdmin } from './lib/admin-auth.mjs';
 import {
   archiveConfig,
   fetchConfigs,
@@ -15,10 +16,13 @@ const app = createApp({
     filePath: databaseFilePath
   }
 });
-
+const adminLogin = await loginAdmin({
+  baseURL: 'http://local.app',
+  fetchImpl: app.fetch
+});
 initAdminApiClient({
   baseURL: 'http://local.app',
-  adminToken: 'dev-admin-token',
+  adminToken: adminLogin.session.token,
   fetchImpl: app.fetch
 });
 
@@ -40,7 +44,7 @@ const draft = await saveConfigDraft({
 
 const configsRender = await bootstrapAndRenderAdminApp({
   baseURL: 'http://local.app',
-  adminToken: 'dev-admin-token',
+  adminToken: adminLogin.session.token,
   fetchImpl: app.fetch,
   gameKey: 'game_sample',
   route: '/configs',
@@ -202,7 +206,7 @@ if (!wrongGameStatusError || !wrongGameStatusError.includes('notice not found'))
 
 const noticesRender = await bootstrapAndRenderAdminApp({
   baseURL: 'http://local.app',
-  adminToken: 'dev-admin-token',
+  adminToken: adminLogin.session.token,
   fetchImpl: app.fetch,
   gameKey: 'game_sample',
   route: '/notices',

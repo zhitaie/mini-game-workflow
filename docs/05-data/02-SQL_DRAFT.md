@@ -20,7 +20,88 @@
 - 状态字段使用 `VARCHAR(32)`
 - 所有表和索引命名尽量简洁稳定
 
-## 3. `game_user`
+## 3. 后台控制面表
+
+### 3.1 `admin_role`
+
+```sql
+CREATE TABLE `admin_role` (
+  `code` VARCHAR(64) NOT NULL,
+  `name` VARCHAR(128) NOT NULL,
+  `permissions_json` JSON NOT NULL,
+  `status` VARCHAR(32) NOT NULL DEFAULT 'active',
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`code`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+```
+
+### 3.2 `admin_user`
+
+```sql
+CREATE TABLE `admin_user` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `username` VARCHAR(128) NOT NULL,
+  `display_name` VARCHAR(128) NOT NULL,
+  `password_hash` VARCHAR(255) NOT NULL,
+  `role_code` VARCHAR(64) NOT NULL,
+  `status` VARCHAR(32) NOT NULL DEFAULT 'active',
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_admin_user_username` (`username`),
+  KEY `idx_admin_user_role_status` (`role_code`, `status`),
+  CONSTRAINT `fk_admin_user_role`
+    FOREIGN KEY (`role_code`) REFERENCES `admin_role` (`code`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+```
+
+### 3.3 `admin_session`
+
+```sql
+CREATE TABLE `admin_session` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `admin_user_id` BIGINT UNSIGNED NOT NULL,
+  `session_token_hash` VARCHAR(255) NOT NULL,
+  `expires_at` DATETIME NOT NULL,
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `last_seen_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `revoked_at` DATETIME DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_admin_session_token` (`session_token_hash`),
+  KEY `idx_admin_session_user` (`admin_user_id`, `expires_at`),
+  KEY `idx_admin_session_active` (`expires_at`, `revoked_at`),
+  CONSTRAINT `fk_admin_session_user`
+    FOREIGN KEY (`admin_user_id`) REFERENCES `admin_user` (`id`)
+    ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+```
+
+### 3.4 `admin_audit_log`
+
+```sql
+CREATE TABLE `admin_audit_log` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `admin_user_id` BIGINT UNSIGNED NOT NULL,
+  `admin_username` VARCHAR(128) NOT NULL,
+  `role_code` VARCHAR(64) NOT NULL,
+  `action` VARCHAR(128) NOT NULL,
+  `target_type` VARCHAR(64) NOT NULL,
+  `target_key` VARCHAR(255) NOT NULL,
+  `game_key` VARCHAR(64) DEFAULT NULL,
+  `detail_json` JSON NOT NULL,
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_admin_audit_game_created` (`game_key`, `created_at`),
+  KEY `idx_admin_audit_actor_created` (`admin_user_id`, `created_at`),
+  KEY `idx_admin_audit_action_created` (`action`, `created_at`),
+  CONSTRAINT `fk_admin_audit_user`
+    FOREIGN KEY (`admin_user_id`) REFERENCES `admin_user` (`id`)
+    ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+```
+
+## 4. `game_user`
 
 ```sql
 CREATE TABLE `game_user` (
@@ -41,7 +122,7 @@ CREATE TABLE `game_user` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 ```
 
-## 4. `user_save`
+## 5. `user_save`
 
 ```sql
 CREATE TABLE `user_save` (
@@ -60,7 +141,7 @@ CREATE TABLE `user_save` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 ```
 
-## 5. `game_config`
+## 6. `game_config`
 
 ```sql
 CREATE TABLE `game_config` (
@@ -89,7 +170,7 @@ CREATE TABLE `game_config` (
 - 但这些 `active` 的客户端版本窗口不能重叠
 - 这个约束首期由服务端发布事务保证，不依赖数据库部分索引
 
-## 6. `notice`
+## 7. `notice`
 
 ```sql
 CREATE TABLE `notice` (
@@ -107,7 +188,7 @@ CREATE TABLE `notice` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 ```
 
-## 7. `ad_log`
+## 8. `ad_log`
 
 ```sql
 CREATE TABLE `ad_log` (
@@ -133,7 +214,7 @@ CREATE TABLE `ad_log` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 ```
 
-## 8. `reward_log`
+## 9. `reward_log`
 
 ```sql
 CREATE TABLE `reward_log` (
@@ -157,7 +238,7 @@ CREATE TABLE `reward_log` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 ```
 
-## 9. `user_asset_balance`
+## 10. `user_asset_balance`
 
 ```sql
 CREATE TABLE `user_asset_balance` (
@@ -176,7 +257,7 @@ CREATE TABLE `user_asset_balance` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 ```
 
-## 10. `analytics_event`
+## 11. `analytics_event`
 
 ```sql
 CREATE TABLE `analytics_event` (
@@ -193,17 +274,21 @@ CREATE TABLE `analytics_event` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 ```
 
-## 11. 首期执行顺序建议
+## 12. 首期执行顺序建议
 
 如果要开始建表，建议顺序：
 
-1. `game_user`
-2. `user_save`
-3. `game_config`
-4. `notice`
-5. `ad_log`
-6. `user_asset_balance`
-7. `reward_log`
-8. `analytics_event`
+1. `admin_role`
+2. `admin_user`
+3. `admin_session`
+4. `admin_audit_log`
+5. `game_user`
+6. `user_save`
+7. `game_config`
+8. `notice`
+9. `ad_log`
+10. `user_asset_balance`
+11. `reward_log`
+12. `analytics_event`
 
 这个顺序与当前实现计划一致。

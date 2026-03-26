@@ -1,4 +1,5 @@
 import { bootstrapGameSample } from '../apps/game-sample/client/dist/apps/game-sample/client/src/bootstrap.js';
+import { loginAdmin } from './lib/admin-auth.mjs';
 import { createApp } from '../services/api-server/dist/services/api-server/src/app.js';
 import { initAdminApiClient } from '../services/admin-web/dist/services/admin-web/src/services/api-client.js';
 import { fetchRewardLogs } from '../services/admin-web/dist/services/admin-web/src/services/reward-logs.js';
@@ -67,9 +68,13 @@ const app2 = createApp({
     filePath: databaseFilePath
   }
 });
+const adminLogin = await loginAdmin({
+  baseURL: 'http://local.app',
+  fetchImpl: app2.fetch
+});
 initAdminApiClient({
   baseURL: 'http://local.app',
-  adminToken: 'dev-admin-token',
+  adminToken: adminLogin.session.token,
   fetchImpl: app2.fetch
 });
 

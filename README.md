@@ -16,6 +16,7 @@
 当前实现说明：
 
 - `services/api-server` 已从纯内存仓储切到基于 `node:sqlite` 的本地文件持久化，用于开发期真实落盘和联调验证
+- `services/api-server` 现在包含后台管理员账号、角色、会话与审计日志模型，后台不再依赖固定开发 token
 - `services/api-server` 现在已经有独立的 Node HTTP 入口，可以通过构建后执行 `node services/api-server/dist/services/api-server/src/cli.js` 启动
 - 根目录现在提供统一的本地 dev stack 入口：先构建，再执行 `npm run dev:stack`，然后打开 `http://127.0.0.1:3100`
 - 这个入口页会同时暴露：
@@ -24,3 +25,9 @@
   - API 健康检查：`http://127.0.0.1:3000/health`
 - `docs/05-data/*.md` 与 `sql/001_init_core_tables.sql` 仍保持 MySQL 8 作为目标生产模型
 - 也就是说，当前代码上的 SQLite 是开发持久化适配层，不是对文档目标数据库的否定
+
+本地开发默认管理员账号：
+
+- `admin / dev-admin-password`
+- `operator / dev-operator-password`
+- `viewer / dev-viewer-password`

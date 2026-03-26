@@ -1,6 +1,7 @@
 import { ok } from '../../common/response.js';
 import type {
   AdminAdLogItem,
+  AdminAuditLogItem,
   AdminAnalyticsEventItem,
   AdminConfigItem,
   AdminDashboardSummary,
@@ -9,7 +10,9 @@ import type {
   AdminNoticeItem,
   AdminRewardLogItem
 } from '@mini-game-workflow/game-core-types';
+import type { AdminActor } from '../../common/admin.js';
 import type { AdLogRepository } from '../../db/repositories/ad-log.repository.js';
+import type { AdminAuditLogRepository } from '../../db/repositories/admin-audit-log.repository.js';
 import type { AnalyticsEventRepository } from '../../db/repositories/analytics-event.repository.js';
 import type { GameConfigRepository } from '../../db/repositories/game-config.repository.js';
 import type { GameUserRepository } from '../../db/repositories/game-user.repository.js';
@@ -29,6 +32,7 @@ export class AdminService {
   private readonly adLogRepository: AdLogRepository;
   private readonly rewardLogRepository: RewardLogRepository;
   private readonly analyticsEventRepository: AnalyticsEventRepository;
+  private readonly adminAuditLogRepository: AdminAuditLogRepository;
 
   constructor(
     gameUserRepository: GameUserRepository,
@@ -36,7 +40,8 @@ export class AdminService {
     noticeRepository: NoticeRepository,
     adLogRepository: AdLogRepository,
     rewardLogRepository: RewardLogRepository,
-    analyticsEventRepository: AnalyticsEventRepository
+    analyticsEventRepository: AnalyticsEventRepository,
+    adminAuditLogRepository: AdminAuditLogRepository
   ) {
     this.gameUserRepository = gameUserRepository;
     this.gameConfigRepository = gameConfigRepository;
@@ -44,6 +49,7 @@ export class AdminService {
     this.adLogRepository = adLogRepository;
     this.rewardLogRepository = rewardLogRepository;
     this.analyticsEventRepository = analyticsEventRepository;
+    this.adminAuditLogRepository = adminAuditLogRepository;
   }
 
   getDashboardSummary(gameKey: string) {
@@ -105,6 +111,7 @@ export class AdminService {
   }
 
   saveConfigDraft(input: {
+    actor: AdminActor;
     gameKey: string;
     platform: string;
     configVersion: string;
@@ -112,11 +119,30 @@ export class AdminService {
     maxClientVersion?: string;
     payload: Record<string, unknown>;
   }) {
-    const record = this.gameConfigRepository.saveDraft(input);
+    const record = this.gameConfigRepository.saveDraft({
+      gameKey: input.gameKey,
+      platform: input.platform,
+      configVersion: input.configVersion,
+      minClientVersion: input.minClientVersion,
+      maxClientVersion: input.maxClientVersion,
+      payload: input.payload
+    });
 
     if (!record) {
       return null;
     }
+
+    this.writeAuditLog(input.actor, {
+      action: 'config.save_draft',
+      targetType: 'game_config',
+      targetKey: `${record.gameKey}:${record.platform}:${record.configVersion}`,
+      gameKey: record.gameKey,
+      detail: {
+        platform: record.platform,
+        configVersion: record.configVersion,
+        status: record.status
+      }
+    });
 
     return ok({
       item: {
@@ -133,6 +159,7 @@ export class AdminService {
   }
 
   publishConfig(input: {
+    actor: AdminActor;
     gameKey: string;
     platform: string;
     configVersion: string;
@@ -142,6 +169,18 @@ export class AdminService {
     if (!record) {
       return null;
     }
+
+    this.writeAuditLog(input.actor, {
+      action: 'config.publish',
+      targetType: 'game_config',
+      targetKey: `${record.gameKey}:${record.platform}:${record.configVersion}`,
+      gameKey: record.gameKey,
+      detail: {
+        platform: record.platform,
+        configVersion: record.configVersion,
+        status: record.status
+      }
+    });
 
     return ok({
       item: {
@@ -158,6 +197,7 @@ export class AdminService {
   }
 
   archiveConfig(input: {
+    actor: AdminActor;
     gameKey: string;
     platform: string;
     configVersion: string;
@@ -167,6 +207,18 @@ export class AdminService {
     if (!record) {
       return null;
     }
+
+    this.writeAuditLog(input.actor, {
+      action: 'config.archive',
+      targetType: 'game_config',
+      targetKey: `${record.gameKey}:${record.platform}:${record.configVersion}`,
+      gameKey: record.gameKey,
+      detail: {
+        platform: record.platform,
+        configVersion: record.configVersion,
+        status: record.status
+      }
+    });
 
     return ok({
       item: {
@@ -201,6 +253,7 @@ export class AdminService {
   }
 
   saveNotice(input: {
+    actor: AdminActor;
     id?: number;
     gameKey: string;
     title: string;
@@ -226,6 +279,17 @@ export class AdminService {
       return null;
     }
 
+    this.writeAuditLog(input.actor, {
+      action: input.id === undefined ? 'notice.create' : 'notice.update',
+      targetType: 'notice',
+      targetKey: String(record.id),
+      gameKey: record.gameKey,
+      detail: {
+        title: record.title,
+        status: record.status
+      }
+    });
+
     return ok({
       item: {
         id: record.id,
@@ -241,6 +305,7 @@ export class AdminService {
   }
 
   setNoticeStatus(input: {
+    actor: AdminActor;
     gameKey: string;
     id: number;
     status: 'draft' | 'active' | 'archived';
@@ -250,6 +315,16 @@ export class AdminService {
     if (!record) {
       return null;
     }
+
+    this.writeAuditLog(input.actor, {
+      action: 'notice.set_status',
+      targetType: 'notice',
+      targetKey: String(record.id),
+      gameKey: record.gameKey,
+      detail: {
+        status: record.status
+      }
+    });
 
     return ok({
       item: {
@@ -327,10 +402,54 @@ export class AdminService {
     return ok(this.wrapList(items));
   }
 
+  listAuditLogs(filters: {
+    gameKey?: string;
+    adminUserId?: number;
+    action?: string;
+    targetType?: string;
+  }) {
+    const items: AdminAuditLogItem[] = this.adminAuditLogRepository.list(filters).map((record) => ({
+      id: record.id,
+      adminUserId: record.adminUserId,
+      adminUsername: record.adminUsername,
+      roleCode: record.roleCode,
+      action: record.action,
+      targetType: record.targetType,
+      targetKey: record.targetKey,
+      gameKey: record.gameKey,
+      detail: record.detail,
+      createdAt: record.createdAt
+    }));
+
+    return ok(this.wrapList(items));
+  }
+
   private wrapList<TItem>(items: TItem[]): AdminListResult<TItem> {
     return {
       items,
       total: items.length
     };
+  }
+
+  private writeAuditLog(
+    actor: AdminActor,
+    input: {
+      action: string;
+      targetType: string;
+      targetKey: string;
+      gameKey: string | null;
+      detail: Record<string, unknown>;
+    }
+  ): void {
+    this.adminAuditLogRepository.create({
+      adminUserId: actor.adminUserId,
+      adminUsername: actor.username,
+      roleCode: actor.roleCode,
+      action: input.action,
+      targetType: input.targetType,
+      targetKey: input.targetKey,
+      gameKey: input.gameKey,
+      detail: input.detail
+    });
   }
 }

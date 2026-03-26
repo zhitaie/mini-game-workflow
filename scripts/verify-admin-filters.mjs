@@ -1,4 +1,5 @@
 import { bootstrapGameSample } from '../apps/game-sample/client/dist/apps/game-sample/client/src/bootstrap.js';
+import { loginAdmin } from './lib/admin-auth.mjs';
 import { createApp } from '../services/api-server/dist/services/api-server/src/app.js';
 import { bootstrapAdminApp, bootstrapAndRenderAdminApp } from '../services/admin-web/dist/services/admin-web/src/main.js';
 
@@ -10,6 +11,10 @@ const app = createApp({
 });
 
 const { runtime, session } = await bootstrapGameSample({
+  baseURL: 'http://local.app',
+  fetchImpl: app.fetch
+});
+const adminLogin = await loginAdmin({
   baseURL: 'http://local.app',
   fetchImpl: app.fetch
 });
@@ -50,7 +55,7 @@ await runtime.network.request({
 
 const usersPage = await bootstrapAdminApp({
   baseURL: 'http://local.app',
-  adminToken: 'dev-admin-token',
+  adminToken: adminLogin.session.token,
   fetchImpl: app.fetch,
   gameKey: 'game_sample',
   route: '/users',
@@ -63,7 +68,7 @@ const usersPage = await bootstrapAdminApp({
 
 const adLogsPage = await bootstrapAdminApp({
   baseURL: 'http://local.app',
-  adminToken: 'dev-admin-token',
+  adminToken: adminLogin.session.token,
   fetchImpl: app.fetch,
   gameKey: 'game_sample',
   route: '/ad-logs',
@@ -76,7 +81,7 @@ const adLogsPage = await bootstrapAdminApp({
 
 const rewardLogsPage = await bootstrapAdminApp({
   baseURL: 'http://local.app',
-  adminToken: 'dev-admin-token',
+  adminToken: adminLogin.session.token,
   fetchImpl: app.fetch,
   gameKey: 'game_sample',
   route: '/reward-logs',
@@ -88,7 +93,7 @@ const rewardLogsPage = await bootstrapAdminApp({
 
 const analyticsPage = await bootstrapAdminApp({
   baseURL: 'http://local.app',
-  adminToken: 'dev-admin-token',
+  adminToken: adminLogin.session.token,
   fetchImpl: app.fetch,
   gameKey: 'game_sample',
   route: '/analytics',
@@ -100,7 +105,7 @@ const analyticsPage = await bootstrapAdminApp({
 
 const configsPage = await bootstrapAdminApp({
   baseURL: 'http://local.app',
-  adminToken: 'dev-admin-token',
+  adminToken: adminLogin.session.token,
   fetchImpl: app.fetch,
   gameKey: 'game_sample',
   route: '/configs',
@@ -112,7 +117,7 @@ const configsPage = await bootstrapAdminApp({
 
 const noticesPage = await bootstrapAdminApp({
   baseURL: 'http://local.app',
-  adminToken: 'dev-admin-token',
+  adminToken: adminLogin.session.token,
   fetchImpl: app.fetch,
   gameKey: 'game_sample',
   route: '/notices',
@@ -147,7 +152,7 @@ if (!noticesPage.page.forms || noticesPage.page.forms.length < 2 || noticesPage.
 
 const rendered = await bootstrapAndRenderAdminApp({
   baseURL: 'http://local.app',
-  adminToken: 'dev-admin-token',
+  adminToken: adminLogin.session.token,
   fetchImpl: app.fetch,
   gameKey: 'game_sample',
   route: '/ad-logs',

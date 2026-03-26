@@ -1,4 +1,5 @@
 import { bootstrapGameSample } from '../apps/game-sample/client/src/bootstrap';
+import { loginAdmin } from './lib/admin-auth';
 import { createApp } from '../services/api-server/src/app';
 import { bootstrapAdminApp } from '../services/admin-web/src/main';
 
@@ -14,10 +15,14 @@ async function main(): Promise<void> {
     baseURL: 'http://local.app',
     fetchImpl: app.fetch
   });
+  const adminLogin = await loginAdmin({
+    baseURL: 'http://local.app',
+    fetchImpl: app.fetch
+  });
 
   const rewardVerification = await bootstrapAdminApp({
     baseURL: 'http://local.app',
-    adminToken: 'dev-admin-token',
+    adminToken: adminLogin.session.token,
     fetchImpl: app.fetch,
     gameKey: 'game_sample',
     route: '/reward-logs',
@@ -28,7 +33,7 @@ async function main(): Promise<void> {
 
   const dashboard = await bootstrapAdminApp({
     baseURL: 'http://local.app',
-    adminToken: 'dev-admin-token',
+    adminToken: adminLogin.session.token,
     fetchImpl: app.fetch,
     gameKey: 'game_sample',
     route: '/dashboard'
@@ -36,7 +41,7 @@ async function main(): Promise<void> {
 
   const users = await bootstrapAdminApp({
     baseURL: 'http://local.app',
-    adminToken: 'dev-admin-token',
+    adminToken: adminLogin.session.token,
     fetchImpl: app.fetch,
     gameKey: 'game_sample',
     route: '/users'
@@ -44,7 +49,7 @@ async function main(): Promise<void> {
 
   const configs = await bootstrapAdminApp({
     baseURL: 'http://local.app',
-    adminToken: 'dev-admin-token',
+    adminToken: adminLogin.session.token,
     fetchImpl: app.fetch,
     gameKey: 'game_sample',
     route: '/configs'

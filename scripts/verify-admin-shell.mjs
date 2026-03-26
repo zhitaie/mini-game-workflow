@@ -1,4 +1,5 @@
 import { bootstrapGameSample } from '../apps/game-sample/client/dist/apps/game-sample/client/src/bootstrap.js';
+import { loginAdmin } from './lib/admin-auth.mjs';
 import { createApp } from '../services/api-server/dist/services/api-server/src/app.js';
 import { bootstrapAdminApp } from '../services/admin-web/dist/services/admin-web/src/main.js';
 
@@ -13,10 +14,14 @@ const { session } = await bootstrapGameSample({
   baseURL: 'http://local.app',
   fetchImpl: app.fetch
 });
+const adminLogin = await loginAdmin({
+  baseURL: 'http://local.app',
+  fetchImpl: app.fetch
+});
 
 const rewardVerification = await bootstrapAdminApp({
   baseURL: 'http://local.app',
-  adminToken: 'dev-admin-token',
+  adminToken: adminLogin.session.token,
   fetchImpl: app.fetch,
   gameKey: 'game_sample',
   route: '/reward-logs',
@@ -27,7 +32,7 @@ const rewardVerification = await bootstrapAdminApp({
 
 const dashboard = await bootstrapAdminApp({
   baseURL: 'http://local.app',
-  adminToken: 'dev-admin-token',
+  adminToken: adminLogin.session.token,
   fetchImpl: app.fetch,
   gameKey: 'game_sample',
   route: '/dashboard'
@@ -35,7 +40,7 @@ const dashboard = await bootstrapAdminApp({
 
 const users = await bootstrapAdminApp({
   baseURL: 'http://local.app',
-  adminToken: 'dev-admin-token',
+  adminToken: adminLogin.session.token,
   fetchImpl: app.fetch,
   gameKey: 'game_sample',
   route: '/users'
@@ -43,7 +48,7 @@ const users = await bootstrapAdminApp({
 
 const configs = await bootstrapAdminApp({
   baseURL: 'http://local.app',
-  adminToken: 'dev-admin-token',
+  adminToken: adminLogin.session.token,
   fetchImpl: app.fetch,
   gameKey: 'game_sample',
   route: '/configs'

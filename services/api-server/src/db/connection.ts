@@ -3,6 +3,60 @@ import { dirname, resolve } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 
 const SQLITE_SCHEMA = `
+CREATE TABLE IF NOT EXISTS admin_role (
+  code TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  permissions_json TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'active',
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS admin_user (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  username TEXT NOT NULL,
+  display_name TEXT NOT NULL,
+  password_hash TEXT NOT NULL,
+  role_code TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'active',
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL,
+  UNIQUE (username),
+  FOREIGN KEY (role_code) REFERENCES admin_role (code)
+);
+CREATE INDEX IF NOT EXISTS idx_admin_user_role_status ON admin_user (role_code, status);
+
+CREATE TABLE IF NOT EXISTS admin_session (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  admin_user_id INTEGER NOT NULL,
+  session_token_hash TEXT NOT NULL,
+  expires_at INTEGER NOT NULL,
+  created_at INTEGER NOT NULL,
+  last_seen_at INTEGER NOT NULL,
+  revoked_at INTEGER,
+  UNIQUE (session_token_hash),
+  FOREIGN KEY (admin_user_id) REFERENCES admin_user (id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_admin_session_user ON admin_session (admin_user_id, expires_at);
+CREATE INDEX IF NOT EXISTS idx_admin_session_active ON admin_session (expires_at, revoked_at);
+
+CREATE TABLE IF NOT EXISTS admin_audit_log (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  admin_user_id INTEGER NOT NULL,
+  admin_username TEXT NOT NULL,
+  role_code TEXT NOT NULL,
+  action TEXT NOT NULL,
+  target_type TEXT NOT NULL,
+  target_key TEXT NOT NULL,
+  game_key TEXT,
+  detail_json TEXT NOT NULL,
+  created_at INTEGER NOT NULL,
+  FOREIGN KEY (admin_user_id) REFERENCES admin_user (id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_admin_audit_game_created ON admin_audit_log (game_key, created_at);
+CREATE INDEX IF NOT EXISTS idx_admin_audit_actor_created ON admin_audit_log (admin_user_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_admin_audit_action_created ON admin_audit_log (action, created_at);
+
 CREATE TABLE IF NOT EXISTS game_user (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   game_key TEXT NOT NULL,

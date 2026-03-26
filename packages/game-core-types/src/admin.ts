@@ -7,6 +7,45 @@ export interface AdminItemResult<TItem> {
   item: TItem;
 }
 
+export type AdminPermissionCode =
+  | 'dashboard.read'
+  | 'users.read'
+  | 'configs.read'
+  | 'configs.write'
+  | 'configs.publish'
+  | 'notices.read'
+  | 'notices.write'
+  | 'logs.read'
+  | 'audit.read';
+
+export type AdminGrantedPermission = AdminPermissionCode | '*';
+
+export interface AdminAuthUser {
+  id: number;
+  username: string;
+  displayName: string;
+  roleCode: string;
+  roleName: string;
+  permissions: AdminGrantedPermission[];
+}
+
+export interface AdminSessionInfo {
+  token: string;
+  expiresAt: number;
+}
+
+export interface AdminAuthLoginResult {
+  session: AdminSessionInfo;
+  adminUser: AdminAuthUser;
+}
+
+export interface AdminAuthMeResult {
+  session: {
+    expiresAt: number;
+  };
+  adminUser: AdminAuthUser;
+}
+
 export interface AdminDashboardSummary {
   gameKey: string;
   totalUsers: number;
@@ -82,5 +121,18 @@ export interface AdminAnalyticsEventItem {
   eventName: string;
   eventData: Record<string, unknown>;
   clientTime: number;
+  createdAt: number;
+}
+
+export interface AdminAuditLogItem {
+  id: number;
+  adminUserId: number;
+  adminUsername: string;
+  roleCode: string;
+  action: string;
+  targetType: string;
+  targetKey: string;
+  gameKey: string | null;
+  detail: Record<string, unknown>;
   createdAt: number;
 }

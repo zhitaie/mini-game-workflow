@@ -1,11 +1,37 @@
+import { createPasswordHash, DEFAULT_ADMIN_ROLES, DEFAULT_ADMIN_USERS } from '../common/admin.js';
 import type { DatabaseConnection, DatabaseConnectionOptions } from './connection.js';
 import { createDatabaseConnection } from './connection.js';
+import { AdminRoleRepository } from './repositories/admin-role.repository.js';
+import { AdminUserRepository } from './repositories/admin-user.repository.js';
 import { GameConfigRepository } from './repositories/game-config.repository.js';
 import { NoticeRepository } from './repositories/notice.repository.js';
 
 export function ensureDevelopmentSeedData(database: DatabaseConnection): void {
+  const adminRoleRepository = new AdminRoleRepository(database);
+  const adminUserRepository = new AdminUserRepository(database);
   const gameConfigRepository = new GameConfigRepository(database);
   const noticeRepository = new NoticeRepository(database);
+
+  for (const role of DEFAULT_ADMIN_ROLES) {
+    adminRoleRepository.upsert({
+      code: role.code,
+      name: role.name,
+      permissions: role.permissions,
+      status: 'active'
+    });
+  }
+
+  for (const user of DEFAULT_ADMIN_USERS) {
+    if (!adminUserRepository.findByUsername(user.username)) {
+      adminUserRepository.upsert({
+        username: user.username,
+        displayName: user.displayName,
+        passwordHash: createPasswordHash(user.password),
+        roleCode: user.roleCode,
+        status: 'active'
+      });
+    }
+  }
 
   gameConfigRepository.ensureActive({
     gameKey: 'game_sample',

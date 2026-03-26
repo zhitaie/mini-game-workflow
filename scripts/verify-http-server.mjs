@@ -1,3 +1,4 @@
+import { loginAdmin } from './lib/admin-auth.mjs';
 import { startServer } from '../services/api-server/dist/services/api-server/src/server.js';
 import { createToken } from '../services/api-server/dist/services/api-server/src/common/auth.js';
 
@@ -65,6 +66,7 @@ const incompatibleConfigResponse = await fetch(
 const incompatibleConfigPayload = await incompatibleConfigResponse.json();
 
 if (
+  incompatibleConfigResponse.status !== 400 ||
   incompatibleConfigResponse.ok ||
   incompatibleConfigPayload.success ||
   incompatibleConfigPayload.code !== 'BAD_REQUEST'
@@ -79,7 +81,7 @@ const forgedSaveResponse = await fetch(`${server.url}/api/save`, {
 });
 const forgedSavePayload = await forgedSaveResponse.json();
 
-if (forgedSaveResponse.ok || forgedSavePayload.success || forgedSavePayload.code !== 'UNAUTHORIZED') {
+if (forgedSaveResponse.status !== 401 || forgedSaveResponse.ok || forgedSavePayload.success || forgedSavePayload.code !== 'UNAUTHORIZED') {
   throw new Error(`Expected forged token request to fail: ${JSON.stringify(forgedSavePayload)}`);
 }
 
@@ -95,7 +97,7 @@ const missingUserSaveResponse = await fetch(`${server.url}/api/save`, {
 });
 const missingUserSavePayload = await missingUserSaveResponse.json();
 
-if (missingUserSaveResponse.ok || missingUserSavePayload.success || missingUserSavePayload.code !== 'UNAUTHORIZED') {
+if (missingUserSaveResponse.status !== 401 || missingUserSaveResponse.ok || missingUserSavePayload.success || missingUserSavePayload.code !== 'UNAUTHORIZED') {
   throw new Error(`Expected missing-user token request to fail: ${JSON.stringify(missingUserSavePayload)}`);
 }
 
@@ -153,9 +155,12 @@ if (
   throw new Error(`Unexpected save verification payload: ${JSON.stringify(saveVerifyPayload)}`);
 }
 
+const adminLogin = await loginAdmin({
+  baseURL: server.url
+});
 const adminUsersResponse = await fetch(`${server.url}/api/admin/users?gameKey=game_sample`, {
   headers: {
-    'x-admin-token': 'dev-admin-token'
+    'x-admin-token': adminLogin.session.token
   }
 });
 const adminUsersPayload = await adminUsersResponse.json();

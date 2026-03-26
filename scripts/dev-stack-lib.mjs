@@ -182,6 +182,7 @@ function createPortalHtml({ apiURL, shellURL }) {
           <div class="dev-meta">
             <div class="dev-chip"><span>API</span><strong>${escapeHtml(apiURL)}</strong></div>
             <div class="dev-chip"><span>Shell</span><strong>${escapeHtml(shellURL)}</strong></div>
+            <div class="dev-chip"><span>Admin</span><strong>admin / dev-admin-password</strong></div>
           </div>
         </section>
 
@@ -223,7 +224,8 @@ function createAdminHtml(apiURL) {
     <script>
       window.__MINI_GAME_ADMIN__ = {
         baseURL: ${JSON.stringify(apiURL)},
-        adminToken: 'dev-admin-token',
+        adminUsername: 'admin',
+        adminPassword: 'dev-admin-password',
         gameKey: 'game_sample',
         containerSelector: '#app'
       };

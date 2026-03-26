@@ -1,5 +1,7 @@
 import { bootstrapAndRenderAdminApp } from './main.js';
 import type { AdminBanner, AdminRoutePath, AdminRenderTarget } from './app/types.js';
+import { loginAdmin } from './services/auth.js';
+import { initAdminApiClient, setAdminApiClientToken } from './services/api-client.js';
 import { archiveConfig, publishConfig, saveConfigDraft } from './services/configs.js';
 import { saveNotice, setNoticeStatus } from './services/notices.js';
 
@@ -8,11 +10,15 @@ declare global {
     __MINI_GAME_ADMIN__?: {
       baseURL?: string;
       adminToken?: string;
+      adminUsername?: string;
+      adminPassword?: string;
       gameKey?: string;
       containerSelector?: string;
     };
   }
 }
+
+const ADMIN_SESSION_STORAGE_KEY = 'mini-game-workflow.admin.sessionToken';
 
 function parseHash(hash: string): {
   route: AdminRoutePath;
@@ -52,6 +58,8 @@ function buildQueryString(query: Record<string, string | undefined>): string {
 export interface StartAdminBrowserAppOptions {
   baseURL?: string;
   adminToken?: string;
+  adminUsername?: string;
+  adminPassword?: string;
   gameKey?: string;
   target?: AdminRenderTarget;
 }
@@ -62,6 +70,7 @@ export async function startAdminBrowserApp(options: StartAdminBrowserAppOptions 
     options.target ??
     (document.querySelector(bootstrap.containerSelector ?? '#app') as AdminRenderTarget | null) ??
     document.body;
+  const baseURL = options.baseURL ?? bootstrap.baseURL ?? 'http://localhost:3000';
   let pendingBanner: AdminBanner | undefined;
 
   const readRouteState = (): {
@@ -98,16 +107,71 @@ export async function startAdminBrowserApp(options: StartAdminBrowserAppOptions 
     const { route, query, gameKey } = readRouteState();
     const banner = pendingBanner;
     pendingBanner = undefined;
+    const ensureAdminToken = async (forceRefresh = false): Promise<string> => {
+      const configuredToken = options.adminToken ?? bootstrap.adminToken;
 
-    await bootstrapAndRenderAdminApp({
-      baseURL: options.baseURL ?? bootstrap.baseURL ?? 'http://localhost:3000',
-      adminToken: options.adminToken ?? bootstrap.adminToken ?? 'dev-admin-token',
-      gameKey,
-      route,
-      query,
-      banner,
-      target
-    });
+      if (!forceRefresh && configuredToken) {
+        return configuredToken;
+      }
+
+      if (!forceRefresh) {
+        const storedToken = window.sessionStorage.getItem(ADMIN_SESSION_STORAGE_KEY);
+
+        if (storedToken) {
+          return storedToken;
+        }
+      }
+
+      const username = options.adminUsername ?? bootstrap.adminUsername;
+      const password = options.adminPassword ?? bootstrap.adminPassword;
+
+      if (!username || !password) {
+        throw new Error('Admin credentials are not configured.');
+      }
+
+      initAdminApiClient({
+        baseURL,
+        fetchImpl: fetch
+      });
+      const login = await loginAdmin({
+        username,
+        password
+      });
+      setAdminApiClientToken(login.session.token);
+      window.sessionStorage.setItem(ADMIN_SESSION_STORAGE_KEY, login.session.token);
+      return login.session.token;
+    };
+
+    let adminToken = await ensureAdminToken();
+
+    try {
+      await bootstrapAndRenderAdminApp({
+        baseURL,
+        adminToken,
+        gameKey,
+        route,
+        query,
+        banner,
+        target
+      });
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('invalid admin session')) {
+        window.sessionStorage.removeItem(ADMIN_SESSION_STORAGE_KEY);
+        adminToken = await ensureAdminToken(true);
+        await bootstrapAndRenderAdminApp({
+          baseURL,
+          adminToken,
+          gameKey,
+          route,
+          query,
+          banner,
+          target
+        });
+        return;
+      }
+
+      throw error;
+    }
   };
 
   const submitMutation = async (

@@ -30,9 +30,105 @@
 
 首期以单体服务端和可维护性优先，不必过早拆成复杂范式。
 
-## 3. 核心表
+### 2.4 后台控制面也必须持久化
 
-### 3.1 `game_user`
+后台只要已经能发配置、改公告，就必须有真实的：
+
+- 管理员账号
+- 角色权限
+- 会话记录
+- 审计日志
+
+否则控制面风险会早于游戏侧业务风险暴露。
+
+## 3. 后台控制面表
+
+### 3.1 `admin_role`
+
+用途：
+
+- 定义后台角色与权限集合
+
+建议字段：
+
+```text
+code
+name
+permissions_json
+status
+created_at
+updated_at
+```
+
+### 3.2 `admin_user`
+
+用途：
+
+- 记录后台管理员账号与角色绑定
+
+建议字段：
+
+```text
+id
+username
+display_name
+password_hash
+role_code
+status
+created_at
+updated_at
+```
+
+关键约束：
+
+- 唯一键：`(username)`
+
+### 3.3 `admin_session`
+
+用途：
+
+- 记录后台登录态和会话生命周期
+
+建议字段：
+
+```text
+id
+admin_user_id
+session_token_hash
+expires_at
+created_at
+last_seen_at
+revoked_at
+```
+
+关键约束：
+
+- 唯一键：`(session_token_hash)`
+
+### 3.4 `admin_audit_log`
+
+用途：
+
+- 审计后台关键写操作
+
+建议字段：
+
+```text
+id
+admin_user_id
+admin_username
+role_code
+action
+target_type
+target_key
+game_key
+detail_json
+created_at
+```
+
+## 4. 游戏侧核心表
+
+### 4.1 `game_user`
 
 用途：
 
@@ -62,7 +158,7 @@ last_login_at
 - 保证同一个平台用户在同一个游戏里只有一条用户记录
 - 同一个平台用户在不同游戏中允许存在多条记录
 
-### 3.2 `user_save`
+### 4.2 `user_save`
 
 用途：
 
@@ -88,7 +184,7 @@ updated_at
 - `save_data_json` 存整份 envelope 的 `data` 部分即可
 - `schema_version` 单独存列，方便过滤和校验
 
-### 3.3 `game_config`
+### 4.3 `game_config`
 
 用途：
 
@@ -126,7 +222,7 @@ updated_at
 - 配置接口必须按客户端版本只命中一份兼容的 `active`
 - `draft` 配置不应被客户端配置接口返回
 
-### 3.4 `notice`
+### 4.4 `notice`
 
 用途：
 
@@ -145,7 +241,7 @@ end_time
 updated_at
 ```
 
-### 3.5 `ad_log`
+### 4.5 `ad_log`
 
 用途：
 
@@ -173,7 +269,7 @@ created_at
 - 唯一键：`(game_key, verification_id)`
 - `(game_key, client_trace_id)`
 
-### 3.6 `reward_log`
+### 4.6 `reward_log`
 
 用途：
 
@@ -203,7 +299,7 @@ created_at
 - 保证同一个业务事件在同一个游戏用户范围内只发一次奖励
 - 为后台和排障提供奖励后的权威余额快照
 
-### 3.7 `user_asset_balance`
+### 4.7 `user_asset_balance`
 
 用途：
 
@@ -235,7 +331,7 @@ updated_at
 - 首期的共用奖励接口只处理这张表上的数值型资产
 - 更复杂的背包、道具、专属状态变更应放到游戏专属模块
 
-### 3.8 `analytics_event`
+### 4.8 `analytics_event`
 
 用途：
 
