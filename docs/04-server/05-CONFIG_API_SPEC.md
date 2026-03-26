@@ -74,7 +74,7 @@ GET /api/config
 }
 ```
 
-配置接口只返回当前“已发布生效”的配置，不返回草稿。
+配置接口只返回当前客户端版本命中的“已发布生效”配置，不返回草稿。
 
 ## 5. 版本规则
 
@@ -130,9 +130,10 @@ GET /api/config
 
 必须满足的规则：
 
-- 同一个 `gameKey + platform` 同一时刻只能有一份 `active`
-- 发布新配置时，应在事务内把旧 `active` 归档，并把目标 `draft` 置为 `active`
-- 客户端不应看到多份同时生效的配置
+- 同一个 `gameKey + platform` 下可以存在多份 `active`
+- 但这些 `active` 的 `minClientVersion / maxClientVersion` 版本窗口不能重叠
+- 配置接口必须按 `clientVersion` 只返回一份命中的 `active`
+- 如果某个客户端版本没有命中任何 `active`，接口应明确返回错误，而不是随意回退到最新配置
 
 ## 9. 必须避免的错误设计
 

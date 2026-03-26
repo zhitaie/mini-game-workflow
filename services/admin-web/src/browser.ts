@@ -1,6 +1,6 @@
 import { bootstrapAndRenderAdminApp } from './main.js';
 import type { AdminBanner, AdminRoutePath, AdminRenderTarget } from './app/types.js';
-import { publishConfig, saveConfigDraft } from './services/configs.js';
+import { archiveConfig, publishConfig, saveConfigDraft } from './services/configs.js';
 import { saveNotice, setNoticeStatus } from './services/notices.js';
 
 declare global {
@@ -147,6 +147,21 @@ export async function startAdminBrowserApp(options: StartAdminBrowserAppOptions 
           banner: {
             tone: 'success',
             message: `已发布配置 ${result.item.platform}:${result.item.configVersion}`
+          }
+        };
+      }
+
+      case 'config.archive': {
+        const result = await archiveConfig({
+          gameKey: String(payload.gameKey ?? ''),
+          platform: String(payload.platform ?? ''),
+          configVersion: String(payload.configVersion ?? '')
+        });
+
+        return {
+          banner: {
+            tone: 'success',
+            message: `已归档配置 ${result.item.platform}:${result.item.configVersion}`
           }
         };
       }

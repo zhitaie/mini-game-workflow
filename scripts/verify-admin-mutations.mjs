@@ -1,7 +1,12 @@
 import { createApp } from '../services/api-server/dist/services/api-server/src/app.js';
 import { bootstrapAndRenderAdminApp } from '../services/admin-web/dist/services/admin-web/src/main.js';
 import { initAdminApiClient } from '../services/admin-web/dist/services/admin-web/src/services/api-client.js';
-import { fetchConfigs, publishConfig, saveConfigDraft } from '../services/admin-web/dist/services/admin-web/src/services/configs.js';
+import {
+  archiveConfig,
+  fetchConfigs,
+  publishConfig,
+  saveConfigDraft
+} from '../services/admin-web/dist/services/admin-web/src/services/configs.js';
 import { fetchNotices, saveNotice, setNoticeStatus } from '../services/admin-web/dist/services/admin-web/src/services/notices.js';
 
 const databaseFilePath = `/tmp/mini-game-workflow-admin-mutations-${Date.now()}-${Math.random().toString(36).slice(2)}.sqlite`;
@@ -21,8 +26,8 @@ const draft = await saveConfigDraft({
   gameKey: 'game_sample',
   platform: 'web',
   configVersion: 'verify-web-v2',
-  minClientVersion: '0.2.0',
-  maxClientVersion: '1.0.0',
+  minClientVersion: '1.0.0',
+  maxClientVersion: '1.9.0',
   payloadJson: JSON.stringify({
     ad: {
       enabled: true
@@ -63,15 +68,85 @@ const configs = await fetchConfigs({
   platform: 'web'
 });
 
-const activeConfig = configs.items.find((item) => item.status === 'active');
-const archivedSeed = configs.items.find((item) => item.configVersion === 'seed-web-v1');
+const activeSeed = configs.items.find((item) => item.configVersion === 'seed-web-v1');
+const activeV2 = configs.items.find((item) => item.configVersion === 'verify-web-v2');
 
 if (!draft.item || published.item.configVersion !== 'verify-web-v2') {
   throw new Error(`Unexpected config mutation result: ${JSON.stringify({ draft, published })}`);
 }
 
-if (!activeConfig || activeConfig.configVersion !== 'verify-web-v2' || archivedSeed?.status !== 'archived') {
+if (!activeSeed || activeSeed.status !== 'active' || !activeV2 || activeV2.status !== 'active') {
   throw new Error(`Unexpected config list after publish: ${JSON.stringify(configs)}`);
+}
+
+const seedConfigResponse = await app.fetch('http://local.app/api/config?gameKey=game_sample&platform=web&clientVersion=0.5.0');
+const seedConfigPayload = await seedConfigResponse.json();
+
+if (!seedConfigResponse.ok || !seedConfigPayload.success || seedConfigPayload.data.configVersion !== 'seed-web-v1') {
+  throw new Error(`Expected seed config to match old client version: ${JSON.stringify(seedConfigPayload)}`);
+}
+
+const v2ConfigResponse = await app.fetch('http://local.app/api/config?gameKey=game_sample&platform=web&clientVersion=1.2.0');
+const v2ConfigPayload = await v2ConfigResponse.json();
+
+if (!v2ConfigResponse.ok || !v2ConfigPayload.success || v2ConfigPayload.data.configVersion !== 'verify-web-v2') {
+  throw new Error(`Expected v2 config to match new client version: ${JSON.stringify(v2ConfigPayload)}`);
+}
+
+const overlapDraft = await saveConfigDraft({
+  gameKey: 'game_sample',
+  platform: 'web',
+  configVersion: 'verify-web-overlap',
+  minClientVersion: '0.8.0',
+  maxClientVersion: '1.2.0',
+  payloadJson: JSON.stringify({
+    ad: {
+      enabled: false
+    }
+  })
+});
+
+let overlapPublishError = null;
+
+try {
+  await publishConfig({
+    gameKey: 'game_sample',
+    platform: 'web',
+    configVersion: 'verify-web-overlap'
+  });
+} catch (error) {
+  overlapPublishError = error instanceof Error ? error.message : String(error);
+}
+
+if (!overlapDraft.item || !overlapPublishError || !overlapPublishError.includes('overlaps active config')) {
+  throw new Error(`Expected overlapping publish to fail: ${JSON.stringify({ overlapDraft, overlapPublishError })}`);
+}
+
+const archivedV2 = await archiveConfig({
+  gameKey: 'game_sample',
+  platform: 'web',
+  configVersion: 'verify-web-v2'
+});
+
+if (archivedV2.item.status !== 'archived') {
+  throw new Error(`Expected archived config status: ${JSON.stringify(archivedV2)}`);
+}
+
+const archivedConfigs = await fetchConfigs({
+  gameKey: 'game_sample',
+  platform: 'web'
+});
+const archivedV2Record = archivedConfigs.items.find((item) => item.configVersion === 'verify-web-v2');
+
+if (!archivedV2Record || archivedV2Record.status !== 'archived') {
+  throw new Error(`Expected archived v2 config in list: ${JSON.stringify(archivedConfigs)}`);
+}
+
+const archivedV2Response = await app.fetch('http://local.app/api/config?gameKey=game_sample&platform=web&clientVersion=1.2.0');
+const archivedV2Payload = await archivedV2Response.json();
+
+if (archivedV2Response.ok || archivedV2Payload.success || archivedV2Payload.code !== 'BAD_REQUEST') {
+  throw new Error(`Expected archived client range to become unavailable: ${JSON.stringify(archivedV2Payload)}`);
 }
 
 const createdNotice = await saveNotice({
@@ -149,8 +224,10 @@ console.log(
     {
       databaseFilePath,
       draftConfig: draft.item,
-      activeConfig,
-      archivedSeed,
+      activeSeed,
+      activeV2,
+      overlapPublishError,
+      archivedV2: archivedV2.item,
       updatedNotice: updatedNotice.item,
       activatedNotice: activatedNotice.item,
       wrongGameStatusError,

@@ -44,8 +44,9 @@
 配置发布时，后台必须通过服务端完成：
 
 - 将目标 `draft` 发布为 `active`
-- 将旧的 `active` 归档为 `archived`
-- 保证同一 `gameKey + platform` 最终只保留一份 `active`
+- 校验它和现有 `active` 的客户端版本窗口不重叠
+- 允许多个 `active` 并存，但必须按版本窗口隔离
+- 支持把某个 `active` 明确归档为 `archived`
 
 ## 3. 仪表盘
 

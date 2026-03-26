@@ -121,7 +121,9 @@ updated_at
 
 - 这里只保存远程运行参数
 - 不保存 `game.config.ts` 里的接入声明
-- 同一个 `game_key + platform` 在任意时刻只能有一份 `active`
+- 同一个 `game_key + platform` 可以存在多份 `active`
+- 但这些 `active` 的 `min_client_version / max_client_version` 版本窗口不能重叠
+- 配置接口必须按客户端版本只命中一份兼容的 `active`
 - `draft` 配置不应被客户端配置接口返回
 
 ### 3.4 `notice`

@@ -157,6 +157,31 @@ export class AdminService {
     });
   }
 
+  archiveConfig(input: {
+    gameKey: string;
+    platform: string;
+    configVersion: string;
+  }) {
+    const record = this.gameConfigRepository.archiveVersion(input.gameKey, input.platform, input.configVersion);
+
+    if (!record) {
+      return null;
+    }
+
+    return ok({
+      item: {
+        gameKey: record.gameKey,
+        platform: record.platform,
+        configVersion: record.configVersion,
+        minClientVersion: record.minClientVersion,
+        maxClientVersion: record.maxClientVersion,
+        payload: record.payload,
+        status: record.status,
+        updatedAt: record.updatedAt
+      }
+    });
+  }
+
   listNotices(filters: {
     gameKey?: string;
     status?: 'draft' | 'active' | 'archived';

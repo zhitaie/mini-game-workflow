@@ -85,7 +85,8 @@ CREATE TABLE `game_config` (
 
 补充约束说明：
 
-- 同一个 `game_key + platform` 同一时刻只能有一条 `status = active`
+- 同一个 `game_key + platform` 可以有多条 `status = active`
+- 但这些 `active` 的客户端版本窗口不能重叠
 - 这个约束首期由服务端发布事务保证，不依赖数据库部分索引
 
 ## 6. `notice`

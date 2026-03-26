@@ -81,7 +81,7 @@ export async function ConfigsPage(context: AdminPageLoaderContext): Promise<Admi
       {
         kind: 'mutation',
         title: '保存草稿配置',
-        description: '先保存 draft，再通过列表动作发布为 active。首期只支持 JSON 对象 payload。',
+        description: '先保存 draft，再通过列表动作发布为 active。允许多个 active 并存，但客户端版本窗口不能重叠。',
         action: 'config.saveDraft',
         submitLabel: '保存草稿',
         fields: [
@@ -134,7 +134,7 @@ export async function ConfigsPage(context: AdminPageLoaderContext): Promise<Admi
     ],
     table: {
       title: '配置版本',
-      description: '草稿和已发布版本都在这里查看，只有 draft 允许直接发布。',
+      description: '草稿和已发布版本都在这里查看。active 可以并存，但版本窗口必须互不重叠。',
       columns: [
         { key: 'platform', label: '平台' },
         { key: 'configVersion', label: '配置版本' },
@@ -163,7 +163,7 @@ export async function ConfigsPage(context: AdminPageLoaderContext): Promise<Admi
                   label: '发布',
                   action: 'config.publish',
                   tone: 'primary',
-                  confirmText: '确认发布这个配置版本？当前 active 版本会被归档。',
+                  confirmText: '确认发布这个配置版本？如果它和已有 active 版本的客户端范围重叠，服务端会拒绝。',
                   payload: {
                     gameKey: config.gameKey,
                     platform: config.platform,
@@ -171,6 +171,21 @@ export async function ConfigsPage(context: AdminPageLoaderContext): Promise<Admi
                   }
                 }
               ]
+            : config.status === 'active'
+              ? [
+                  {
+                    kind: 'submit',
+                    label: '归档',
+                    action: 'config.archive',
+                    tone: 'danger',
+                    confirmText: '确认归档这个 active 配置版本？归档后对应客户端范围将不再下发该配置。',
+                    payload: {
+                      gameKey: config.gameKey,
+                      platform: config.platform,
+                      configVersion: config.configVersion
+                    }
+                  }
+                ]
             : undefined
       })),
       emptyText: '当前筛选条件下没有配置记录。'
@@ -181,7 +196,8 @@ export async function ConfigsPage(context: AdminPageLoaderContext): Promise<Admi
         lines: [
           '配置页必须区分 draft / active / archived。',
           '配置页只能操作远程运行配置，不能覆盖接入声明。',
-          'active 版本一旦发布，不允许直接改写成 draft；如需调整，应新建版本。'
+          'active 版本一旦发布，不允许直接改写成 draft；如需调整，应新建版本。',
+          '多个 active 可以并存，但同一 gameKey + platform 下客户端版本窗口不能重叠。'
         ]
       }
     ]

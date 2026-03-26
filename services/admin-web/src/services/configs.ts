@@ -28,6 +28,12 @@ export interface PublishConfigInput {
   configVersion: string;
 }
 
+export interface ArchiveConfigInput {
+  gameKey: string;
+  platform: string;
+  configVersion: string;
+}
+
 function parsePayload(payloadJson: string): Record<string, unknown> {
   const parsed = JSON.parse(payloadJson || '{}') as unknown;
 
@@ -54,6 +60,13 @@ export async function saveConfigDraft(input: SaveConfigDraftInput): Promise<Admi
 
 export async function publishConfig(input: PublishConfigInput): Promise<AdminItemResult<AdminConfigItem>> {
   return request<AdminItemResult<AdminConfigItem>>('/api/admin/configs/publish', {
+    method: 'POST',
+    body: input
+  });
+}
+
+export async function archiveConfig(input: ArchiveConfigInput): Promise<AdminItemResult<AdminConfigItem>> {
+  return request<AdminItemResult<AdminConfigItem>>('/api/admin/configs/archive', {
     method: 'POST',
     body: input
   });

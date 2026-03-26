@@ -35,7 +35,7 @@ export interface AdminLinkAction {
 export interface AdminSubmitAction {
   kind: 'submit';
   label: string;
-  action: 'config.saveDraft' | 'config.publish' | 'notice.save' | 'notice.setStatus';
+  action: 'config.saveDraft' | 'config.publish' | 'config.archive' | 'notice.save' | 'notice.setStatus';
   payload?: Record<string, string | number | boolean>;
   confirmText?: string;
   tone?: 'default' | 'primary' | 'danger';

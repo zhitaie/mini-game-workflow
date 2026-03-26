@@ -428,6 +428,22 @@ export function createApp(options: CreateAppOptions = {}): ApiApp {
           return json(response);
         }
 
+        if (url.pathname === '/api/admin/configs/archive' && method === 'POST') {
+          requireAdmin(init?.headers);
+          const body = parseBody(init);
+          const response = adminService.archiveConfig({
+            gameKey: readRequiredString(body, 'gameKey'),
+            platform: readRequiredString(body, 'platform'),
+            configVersion: readRequiredString(body, 'configVersion')
+          });
+
+          if (!response) {
+            throw new AppError(errorCodes.BAD_REQUEST, 'config version not found');
+          }
+
+          return json(response);
+        }
+
         if (url.pathname === '/api/admin/notices' && method === 'GET') {
           requireAdmin(init?.headers);
           return json(
@@ -527,7 +543,10 @@ export function createApp(options: CreateAppOptions = {}): ApiApp {
 
         if (
           error instanceof Error &&
-          (error.message.startsWith('No active config') || error.message.startsWith('Client version '))
+          (
+            error.message.startsWith('No compatible active config') ||
+            error.message.startsWith('Config version window overlaps active config')
+          )
         ) {
           return json(fail(errorCodes.BAD_REQUEST, error.message), 400);
         }
