@@ -12,13 +12,15 @@ function summarizeJson(value: Record<string, unknown>): string {
 }
 
 export async function ConfigsPage(context: AdminPageLoaderContext): Promise<AdminPageModel> {
+  const platform = typeof context.query?.platform === 'string' ? context.query.platform : undefined;
+  const status =
+    context.query?.status === 'draft' || context.query?.status === 'active' || context.query?.status === 'archived'
+      ? context.query.status
+      : undefined;
   const configs = await fetchConfigs({
     gameKey: context.gameKey,
-    platform: typeof context.query?.platform === 'string' ? context.query.platform : undefined,
-    status:
-      context.query?.status === 'draft' || context.query?.status === 'active' || context.query?.status === 'archived'
-        ? context.query.status
-        : undefined
+    platform,
+    status
   });
 
   return {
@@ -34,11 +36,50 @@ export async function ConfigsPage(context: AdminPageLoaderContext): Promise<Admi
       {
         key: 'platform',
         label: 'Platform',
-        value: stringifyValue(typeof context.query?.platform === 'string' ? context.query.platform : undefined) || 'all'
+        value: stringifyValue(platform) || 'all'
+      },
+      {
+        key: 'status',
+        label: '状态',
+        value: stringifyValue(status) || 'all'
       }
     ],
     forms: [
       {
+        kind: 'query',
+        title: '筛选配置',
+        description: '按平台和状态查看当前配置版本分布。',
+        submitLabel: '应用筛选',
+        fields: [
+          {
+            key: 'gameKey',
+            label: 'Game Key',
+            type: 'hidden',
+            value: context.gameKey
+          },
+          {
+            key: 'platform',
+            label: '平台',
+            type: 'text',
+            value: platform ?? '',
+            placeholder: '例如 web'
+          },
+          {
+            key: 'status',
+            label: '状态',
+            type: 'select',
+            value: status ?? '',
+            options: [
+              { label: 'all', value: '' },
+              { label: 'draft', value: 'draft' },
+              { label: 'active', value: 'active' },
+              { label: 'archived', value: 'archived' }
+            ]
+          }
+        ]
+      },
+      {
+        kind: 'mutation',
         title: '保存草稿配置',
         description: '先保存 draft，再通过列表动作发布为 active。首期只支持 JSON 对象 payload。',
         action: 'config.saveDraft',
@@ -54,7 +95,7 @@ export async function ConfigsPage(context: AdminPageLoaderContext): Promise<Admi
             key: 'platform',
             label: '平台',
             type: 'text',
-            value: typeof context.query?.platform === 'string' ? context.query.platform : 'web',
+            value: platform ?? 'web',
             required: true
           },
           {
@@ -122,6 +163,7 @@ export async function ConfigsPage(context: AdminPageLoaderContext): Promise<Admi
                   label: '发布',
                   action: 'config.publish',
                   tone: 'primary',
+                  confirmText: '确认发布这个配置版本？当前 active 版本会被归档。',
                   payload: {
                     gameKey: config.gameKey,
                     platform: config.platform,

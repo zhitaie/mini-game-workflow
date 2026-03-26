@@ -75,7 +75,7 @@ export interface AdminFormFieldOption {
 export interface AdminFormField {
   key: string;
   label: string;
-  type: 'text' | 'textarea' | 'select' | 'hidden';
+  type: 'text' | 'textarea' | 'select' | 'hidden' | 'datetime-local';
   value?: string;
   placeholder?: string;
   required?: boolean;
@@ -83,13 +83,25 @@ export interface AdminFormField {
   options?: AdminFormFieldOption[];
 }
 
-export interface AdminFormSection {
+export interface AdminMutationFormSection {
+  kind: 'mutation';
   title: string;
   description: string;
   action: AdminSubmitAction['action'];
   submitLabel: string;
   fields: AdminFormField[];
 }
+
+export interface AdminQueryFormSection {
+  kind: 'query';
+  title: string;
+  description: string;
+  route?: AdminRoutePath;
+  submitLabel: string;
+  fields: AdminFormField[];
+}
+
+export type AdminFormSection = AdminMutationFormSection | AdminQueryFormSection;
 
 export interface AdminBanner {
   tone: 'success' | 'error';

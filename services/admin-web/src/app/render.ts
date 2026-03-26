@@ -153,7 +153,7 @@ function renderField(sectionTitle: string, field: AdminFormSection['fields'][num
         class="admin-form-input"
         id="${escapeHtml(inputId)}"
         name="${escapeHtml(field.key)}"
-        type="text"
+        type="${field.type === 'datetime-local' ? 'datetime-local' : 'text'}"
         value="${escapeHtml(field.value ?? '')}"
         placeholder="${escapeHtml(field.placeholder ?? '')}"${required}
       />
@@ -161,7 +161,7 @@ function renderField(sectionTitle: string, field: AdminFormSection['fields'][num
   `;
 }
 
-function renderForms(forms: AdminFormSection[] | undefined): string {
+function renderForms(currentPath: string, forms: AdminFormSection[] | undefined): string {
   if (!forms || forms.length === 0) {
     return '';
   }
@@ -178,12 +178,17 @@ function renderForms(forms: AdminFormSection[] | undefined): string {
                   <p>${escapeHtml(form.description)}</p>
                 </div>
               </div>
-              <form class="admin-form" data-admin-form-action="${escapeHtml(form.action)}">
+              <form
+                class="admin-form"
+                data-admin-form-kind="${escapeHtml(form.kind)}"
+                ${form.kind === 'mutation' ? `data-admin-form-action="${escapeHtml(form.action)}"` : ''}
+                ${form.kind === 'query' ? `data-admin-form-route="${escapeHtml(form.route ?? currentPath)}"` : ''}
+              >
                 <div class="admin-form-layout">
                   ${form.fields.map((field) => renderField(form.title, field)).join('')}
                 </div>
                 <div class="admin-form-submit-row">
-                  <button class="admin-button admin-button-primary" type="submit">
+                  <button class="admin-button ${form.kind === 'mutation' ? 'admin-button-primary' : 'admin-button-default'}" type="submit">
                     ${escapeHtml(form.submitLabel)}
                   </button>
                 </div>
@@ -727,7 +732,7 @@ export function renderAdminSnapshot(snapshot: AdminAppSnapshot): string {
         ${renderBanner(snapshot.page.banner)}
         ${renderFilters(snapshot.page.filters)}
         ${renderMetrics(snapshot.page.metrics)}
-        ${renderForms(snapshot.page.forms)}
+        ${renderForms(snapshot.page.path, snapshot.page.forms)}
         ${renderTable(snapshot.gameKey, snapshot.page.table)}
         ${renderNotes(snapshot.page.notes)}
       </main>

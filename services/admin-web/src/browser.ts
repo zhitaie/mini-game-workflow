@@ -206,12 +206,6 @@ export async function startAdminBrowserApp(options: StartAdminBrowserAppOptions 
         return;
       }
 
-      const action = form.dataset.adminFormAction;
-
-      if (!action) {
-        return;
-      }
-
       event.preventDefault();
 
       const payload: Record<string, unknown> = {};
@@ -223,6 +217,28 @@ export async function startAdminBrowserApp(options: StartAdminBrowserAppOptions 
       });
 
       const { route, gameKey, query } = readRouteState();
+      const formKind = form.dataset.adminFormKind;
+
+      if (formKind === 'query') {
+        const nextRoute = (form.dataset.adminFormRoute as AdminRoutePath | undefined) ?? route;
+        const nextGameKey =
+          typeof payload.gameKey === 'string' && payload.gameKey.trim() ? String(payload.gameKey).trim() : gameKey;
+        const nextQuery = Object.fromEntries(
+          Object.entries(payload)
+            .filter(([key, value]) => key !== 'gameKey' && typeof value === 'string' && value.trim() !== '')
+            .map(([key, value]) => [key, String(value).trim()])
+        ) as Record<string, string>;
+
+        navigate(nextRoute, nextGameKey, nextQuery);
+        return;
+      }
+
+      const action = form.dataset.adminFormAction;
+
+      if (!action) {
+        return;
+      }
+
       void submitMutation(action, payload)
         .then((result) => {
           pendingBanner = result.banner;

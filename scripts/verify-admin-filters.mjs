@@ -1,0 +1,184 @@
+import { bootstrapGameSample } from '../apps/game-sample/client/dist/apps/game-sample/client/src/bootstrap.js';
+import { createApp } from '../services/api-server/dist/services/api-server/src/app.js';
+import { bootstrapAdminApp, bootstrapAndRenderAdminApp } from '../services/admin-web/dist/services/admin-web/src/main.js';
+
+const databaseFilePath = `/tmp/mini-game-workflow-admin-filters-${Date.now()}-${Math.random().toString(36).slice(2)}.sqlite`;
+const app = createApp({
+  database: {
+    filePath: databaseFilePath
+  }
+});
+
+const { runtime, session } = await bootstrapGameSample({
+  baseURL: 'http://local.app',
+  fetchImpl: app.fetch
+});
+
+runtime.analytics.track({
+  eventName: 'admin_filter_ping',
+  eventData: {
+    source: 'verify-admin-filters'
+  }
+});
+await runtime.analytics.flush();
+
+const adResult = await runtime.ad.showRewardedVideo('doubleCoinReward');
+const verification = await runtime.network.request({
+  path: '/api/ad/verify',
+  method: 'POST',
+  requiresAuth: true,
+  body: {
+    sceneKey: adResult.sceneKey,
+    adType: adResult.adType,
+    platformResult: {
+      completed: adResult.completed
+    }
+  }
+});
+
+await runtime.network.request({
+  path: '/api/reward/claim',
+  method: 'POST',
+  requiresAuth: true,
+  body: {
+    rewardType: 'gold',
+    amount: 30,
+    reason: 'reward_ad',
+    bizId: verification.verificationId
+  }
+});
+
+const usersPage = await bootstrapAdminApp({
+  baseURL: 'http://local.app',
+  adminToken: 'dev-admin-token',
+  fetchImpl: app.fetch,
+  gameKey: 'game_sample',
+  route: '/users',
+  query: {
+    platform: 'web',
+    platformOpenId: 'web:web-mock-login-code',
+    status: 'active'
+  }
+});
+
+const adLogsPage = await bootstrapAdminApp({
+  baseURL: 'http://local.app',
+  adminToken: 'dev-admin-token',
+  fetchImpl: app.fetch,
+  gameKey: 'game_sample',
+  route: '/ad-logs',
+  query: {
+    gameUserId: String(session.user.id),
+    verified: 'true',
+    completed: 'true'
+  }
+});
+
+const rewardLogsPage = await bootstrapAdminApp({
+  baseURL: 'http://local.app',
+  adminToken: 'dev-admin-token',
+  fetchImpl: app.fetch,
+  gameKey: 'game_sample',
+  route: '/reward-logs',
+  query: {
+    gameUserId: String(session.user.id),
+    reason: 'reward_ad'
+  }
+});
+
+const analyticsPage = await bootstrapAdminApp({
+  baseURL: 'http://local.app',
+  adminToken: 'dev-admin-token',
+  fetchImpl: app.fetch,
+  gameKey: 'game_sample',
+  route: '/analytics',
+  query: {
+    gameUserId: String(session.user.id),
+    eventName: 'admin_filter_ping'
+  }
+});
+
+const configsPage = await bootstrapAdminApp({
+  baseURL: 'http://local.app',
+  adminToken: 'dev-admin-token',
+  fetchImpl: app.fetch,
+  gameKey: 'game_sample',
+  route: '/configs',
+  query: {
+    platform: 'web',
+    status: 'active'
+  }
+});
+
+const noticesPage = await bootstrapAdminApp({
+  baseURL: 'http://local.app',
+  adminToken: 'dev-admin-token',
+  fetchImpl: app.fetch,
+  gameKey: 'game_sample',
+  route: '/notices',
+  query: {
+    status: 'active'
+  }
+});
+
+if (!usersPage.page.forms || usersPage.page.forms[0]?.kind !== 'query' || usersPage.page.table?.rows.length !== 1) {
+  throw new Error(`Unexpected users filtered page: ${JSON.stringify(usersPage)}`);
+}
+
+if (!adLogsPage.page.table || adLogsPage.page.table.rows.length !== 1) {
+  throw new Error(`Unexpected ad log filtered page: ${JSON.stringify(adLogsPage)}`);
+}
+
+if (!rewardLogsPage.page.table || rewardLogsPage.page.table.rows.length !== 1) {
+  throw new Error(`Unexpected reward log filtered page: ${JSON.stringify(rewardLogsPage)}`);
+}
+
+if (!analyticsPage.page.table || analyticsPage.page.table.rows.length !== 1) {
+  throw new Error(`Unexpected analytics filtered page: ${JSON.stringify(analyticsPage)}`);
+}
+
+if (!configsPage.page.forms || configsPage.page.forms.length < 2 || configsPage.page.forms[0]?.kind !== 'query') {
+  throw new Error(`Unexpected configs page forms: ${JSON.stringify(configsPage)}`);
+}
+
+if (!noticesPage.page.forms || noticesPage.page.forms.length < 2 || noticesPage.page.forms[0]?.kind !== 'query') {
+  throw new Error(`Unexpected notices page forms: ${JSON.stringify(noticesPage)}`);
+}
+
+const rendered = await bootstrapAndRenderAdminApp({
+  baseURL: 'http://local.app',
+  adminToken: 'dev-admin-token',
+  fetchImpl: app.fetch,
+  gameKey: 'game_sample',
+  route: '/ad-logs',
+  query: {
+    gameUserId: String(session.user.id),
+    verified: 'true'
+  },
+  target: {
+    innerHTML: ''
+  }
+});
+
+if (!rendered.html.includes('data-admin-form-kind="query"') || !rendered.html.includes('data-admin-form-route="/ad-logs"')) {
+  throw new Error(`Expected query form markers in rendered admin html: ${rendered.html}`);
+}
+
+console.log(
+  JSON.stringify(
+    {
+      databaseFilePath,
+      filteredUsers: usersPage.page.table.rows.length,
+      filteredAdLogs: adLogsPage.page.table.rows.length,
+      filteredRewardLogs: rewardLogsPage.page.table.rows.length,
+      filteredAnalytics: analyticsPage.page.table.rows.length,
+      configsFormKinds: configsPage.page.forms.map((form) => form.kind),
+      noticesFormKinds: noticesPage.page.forms.map((form) => form.kind),
+      renderedContainsQueryForm: true
+    },
+    null,
+    2
+  )
+);
+
+app.close();

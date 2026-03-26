@@ -2,6 +2,18 @@ import { formatTimestamp, stringifyValue } from '../../app/format.js';
 import type { AdminPageLoaderContext, AdminPageModel } from '../../app/types.js';
 import { fetchAdLogs } from '../../services/ad-logs.js';
 
+function parseBooleanFilter(value: string | number | boolean | undefined): boolean | undefined {
+  if (value === true || value === 'true') {
+    return true;
+  }
+
+  if (value === false || value === 'false') {
+    return false;
+  }
+
+  return undefined;
+}
+
 export async function AdLogsPage(context: AdminPageLoaderContext): Promise<AdminPageModel> {
   const gameUserId =
     typeof context.query?.gameUserId === 'number'
@@ -9,12 +21,15 @@ export async function AdLogsPage(context: AdminPageLoaderContext): Promise<Admin
       : typeof context.query?.gameUserId === 'string'
         ? Number(context.query.gameUserId)
         : undefined;
+  const sceneKey = typeof context.query?.sceneKey === 'string' ? context.query.sceneKey : undefined;
+  const verified = parseBooleanFilter(context.query?.verified);
+  const completed = parseBooleanFilter(context.query?.completed);
   const logs = await fetchAdLogs({
     gameKey: context.gameKey,
     gameUserId: Number.isFinite(gameUserId) ? gameUserId : undefined,
-    sceneKey: typeof context.query?.sceneKey === 'string' ? context.query.sceneKey : undefined,
-    verified: typeof context.query?.verified === 'boolean' ? context.query.verified : undefined,
-    completed: typeof context.query?.completed === 'boolean' ? context.query.completed : undefined
+    sceneKey,
+    verified,
+    completed
   });
 
   return {
@@ -31,6 +46,73 @@ export async function AdLogsPage(context: AdminPageLoaderContext): Promise<Admin
         key: 'gameUserId',
         label: 'User',
         value: stringifyValue(gameUserId) || 'all'
+      },
+      {
+        key: 'sceneKey',
+        label: '场景',
+        value: stringifyValue(sceneKey) || 'all'
+      },
+      {
+        key: 'verified',
+        label: '已校验',
+        value: stringifyValue(verified) || 'all'
+      },
+      {
+        key: 'completed',
+        label: '已完成',
+        value: stringifyValue(completed) || 'all'
+      }
+    ],
+    forms: [
+      {
+        kind: 'query',
+        title: '筛选广告日志',
+        description: '按用户、场景和校验状态快速定位广告问题。',
+        submitLabel: '应用筛选',
+        fields: [
+          {
+            key: 'gameKey',
+            label: 'Game Key',
+            type: 'hidden',
+            value: context.gameKey
+          },
+          {
+            key: 'gameUserId',
+            label: '用户 ID',
+            type: 'text',
+            value: Number.isFinite(gameUserId) ? String(gameUserId) : '',
+            placeholder: '例如 1'
+          },
+          {
+            key: 'sceneKey',
+            label: '场景',
+            type: 'text',
+            value: sceneKey ?? '',
+            placeholder: '例如 doubleCoinReward'
+          },
+          {
+            key: 'verified',
+            label: '已校验',
+            type: 'select',
+            value: stringifyValue(verified),
+            options: [
+              { label: 'all', value: '' },
+              { label: 'true', value: 'true' },
+              { label: 'false', value: 'false' }
+            ]
+          },
+          {
+            key: 'completed',
+            label: '已完成',
+            type: 'select',
+            value: stringifyValue(completed),
+            options: [
+              { label: 'all', value: '' },
+              { label: 'true', value: 'true' },
+              { label: 'false', value: 'false' }
+            ]
+          }
+        ]
       }
     ],
     table: {
@@ -55,7 +137,23 @@ export async function AdLogsPage(context: AdminPageLoaderContext): Promise<Admin
           completed: String(log.completed),
           errorCode: log.errorCode ?? '-',
           createdAt: formatTimestamp(log.createdAt)
-        }
+        },
+        actions: [
+          {
+            label: '看该用户奖励',
+            path: '/reward-logs',
+            query: {
+              gameUserId: log.gameUserId
+            }
+          },
+          {
+            label: '看该用户埋点',
+            path: '/analytics',
+            query: {
+              gameUserId: log.gameUserId
+            }
+          }
+        ]
       })),
       emptyText: '当前筛选条件下没有广告校验记录。'
     }

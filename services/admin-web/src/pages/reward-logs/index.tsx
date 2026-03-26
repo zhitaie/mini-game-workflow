@@ -9,12 +9,15 @@ export async function RewardLogsPage(context: AdminPageLoaderContext): Promise<A
       : typeof context.query?.gameUserId === 'string'
         ? Number(context.query.gameUserId)
         : undefined;
+  const rewardType = typeof context.query?.rewardType === 'string' ? context.query.rewardType : undefined;
+  const reason = typeof context.query?.reason === 'string' ? context.query.reason : undefined;
+  const bizId = typeof context.query?.bizId === 'string' ? context.query.bizId : undefined;
   const logs = await fetchRewardLogs({
     gameKey: context.gameKey,
     gameUserId: Number.isFinite(gameUserId) ? gameUserId : undefined,
-    rewardType: typeof context.query?.rewardType === 'string' ? context.query.rewardType : undefined,
-    reason: typeof context.query?.reason === 'string' ? context.query.reason : undefined,
-    bizId: typeof context.query?.bizId === 'string' ? context.query.bizId : undefined
+    rewardType,
+    reason,
+    bizId
   });
 
   return {
@@ -31,6 +34,65 @@ export async function RewardLogsPage(context: AdminPageLoaderContext): Promise<A
         key: 'gameUserId',
         label: 'User',
         value: stringifyValue(gameUserId) || 'all'
+      },
+      {
+        key: 'rewardType',
+        label: '奖励类型',
+        value: stringifyValue(rewardType) || 'all'
+      },
+      {
+        key: 'reason',
+        label: '原因',
+        value: stringifyValue(reason) || 'all'
+      },
+      {
+        key: 'bizId',
+        label: '业务号',
+        value: stringifyValue(bizId) || 'all'
+      }
+    ],
+    forms: [
+      {
+        kind: 'query',
+        title: '筛选奖励日志',
+        description: '按用户、奖励类型、原因和业务号缩小范围。',
+        submitLabel: '应用筛选',
+        fields: [
+          {
+            key: 'gameKey',
+            label: 'Game Key',
+            type: 'hidden',
+            value: context.gameKey
+          },
+          {
+            key: 'gameUserId',
+            label: '用户 ID',
+            type: 'text',
+            value: Number.isFinite(gameUserId) ? String(gameUserId) : '',
+            placeholder: '例如 1'
+          },
+          {
+            key: 'rewardType',
+            label: '奖励类型',
+            type: 'text',
+            value: rewardType ?? '',
+            placeholder: '例如 gold'
+          },
+          {
+            key: 'reason',
+            label: '原因',
+            type: 'text',
+            value: reason ?? '',
+            placeholder: '例如 reward_ad'
+          },
+          {
+            key: 'bizId',
+            label: '业务号',
+            type: 'text',
+            value: bizId ?? '',
+            placeholder: '例如 verify-xxx'
+          }
+        ]
       }
     ],
     table: {
@@ -60,6 +122,13 @@ export async function RewardLogsPage(context: AdminPageLoaderContext): Promise<A
           {
             label: '回看广告校验',
             path: '/ad-logs',
+            query: {
+              gameUserId: log.gameUserId
+            }
+          },
+          {
+            label: '看该用户埋点',
+            path: '/analytics',
             query: {
               gameUserId: log.gameUserId
             }

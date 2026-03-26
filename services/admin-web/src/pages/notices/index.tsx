@@ -13,12 +13,13 @@ function toDatetimeLocalValue(value: number | null): string {
 }
 
 export async function NoticesPage(context: AdminPageLoaderContext): Promise<AdminPageModel> {
+  const status =
+    context.query?.status === 'draft' || context.query?.status === 'active' || context.query?.status === 'archived'
+      ? context.query.status
+      : undefined;
   const notices = await fetchNotices({
     gameKey: context.gameKey,
-    status:
-      context.query?.status === 'draft' || context.query?.status === 'active' || context.query?.status === 'archived'
-        ? context.query.status
-        : undefined
+    status
   });
   const editingNoticeId =
     typeof context.query?.editNoticeId === 'string' && context.query.editNoticeId
@@ -37,12 +38,44 @@ export async function NoticesPage(context: AdminPageLoaderContext): Promise<Admi
         key: 'gameKey',
         label: 'Game',
         value: context.gameKey
+      },
+      {
+        key: 'status',
+        label: '状态',
+        value: status ?? 'all'
       }
     ],
     forms: [
       {
+        kind: 'query',
+        title: '筛选公告',
+        description: '按状态查看 draft / active / archived 公告。',
+        submitLabel: '应用筛选',
+        fields: [
+          {
+            key: 'gameKey',
+            label: 'Game Key',
+            type: 'hidden',
+            value: context.gameKey
+          },
+          {
+            key: 'status',
+            label: '状态',
+            type: 'select',
+            value: status ?? '',
+            options: [
+              { label: 'all', value: '' },
+              { label: 'draft', value: 'draft' },
+              { label: 'active', value: 'active' },
+              { label: 'archived', value: 'archived' }
+            ]
+          }
+        ]
+      },
+      {
+        kind: 'mutation',
         title: editingNotice ? `编辑公告 #${editingNotice.id}` : '创建公告',
-        description: editingNotice ? '修改已存在公告的内容、状态和生效时间。' : '新公告默认建议先保存为 draft，再切换状态。 ',
+        description: editingNotice ? '修改已存在公告的内容、状态和生效时间。' : '新公告默认建议先保存为 draft，再切换状态。',
         action: 'notice.save',
         submitLabel: editingNotice ? '保存修改' : '创建公告',
         fields: [
@@ -87,14 +120,14 @@ export async function NoticesPage(context: AdminPageLoaderContext): Promise<Admi
           {
             key: 'startTime',
             label: '开始时间',
-            type: 'text',
+            type: 'datetime-local',
             placeholder: '2026-03-26T09:00',
             value: editingNotice ? toDatetimeLocalValue(editingNotice.startTime) : ''
           },
           {
             key: 'endTime',
             label: '结束时间',
-            type: 'text',
+            type: 'datetime-local',
             placeholder: '2026-03-30T23:59',
             value: editingNotice ? toDatetimeLocalValue(editingNotice.endTime) : ''
           }
@@ -135,6 +168,7 @@ export async function NoticesPage(context: AdminPageLoaderContext): Promise<Admi
                   label: '设为 active',
                   action: 'notice.setStatus' as const,
                   tone: 'primary' as const,
+                  confirmText: '确认将这条公告切换为 active？',
                   payload: {
                     id: notice.id,
                     status: 'active'
@@ -149,6 +183,7 @@ export async function NoticesPage(context: AdminPageLoaderContext): Promise<Admi
                   label: '归档',
                   action: 'notice.setStatus' as const,
                   tone: 'danger' as const,
+                  confirmText: '确认归档这条公告？归档后客户端将不再读取。',
                   payload: {
                     id: notice.id,
                     status: 'archived'

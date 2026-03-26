@@ -9,6 +9,7 @@
     "db:init": "node --experimental-specifier-resolution=node scripts/init-dev-db.mjs",
     "verify:minimal": "node --experimental-specifier-resolution=node scripts/verify-minimal-flow.mjs",
     "verify:admin": "node --experimental-specifier-resolution=node scripts/verify-admin-flow.mjs",
+    "verify:admin-filters": "node --experimental-specifier-resolution=node scripts/verify-admin-filters.mjs",
     "verify:admin-mutations": "node --experimental-specifier-resolution=node scripts/verify-admin-mutations.mjs",
     "verify:admin-shell": "node --experimental-specifier-resolution=node scripts/verify-admin-shell.mjs",
     "verify:admin-render": "node --experimental-specifier-resolution=node scripts/verify-admin-render.mjs",
