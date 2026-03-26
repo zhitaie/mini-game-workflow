@@ -13,6 +13,14 @@
         containerSelector: '#app'
       };
     </script>
+    <script type="importmap">
+      {
+        "imports": {
+          "@mini-game-workflow/game-core-client": "./dist/packages/game-core-client/src/index.js",
+          "@mini-game-workflow/game-core-types": "./dist/packages/game-core-types/src/index.js"
+        }
+      }
+    </script>
     <script type="module">
       import { startGameSampleBrowserApp } from './dist/apps/game-sample/client/src/browser.js';
 
