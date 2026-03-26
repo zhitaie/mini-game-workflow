@@ -1,4 +1,5 @@
 import { startServer } from '../services/api-server/dist/services/api-server/src/server.js';
+import { createToken } from '../services/api-server/dist/services/api-server/src/common/auth.js';
 
 const databaseFilePath = `/tmp/mini-game-workflow-http-${Date.now()}-${Math.random().toString(36).slice(2)}.sqlite`;
 const server = await startServer({
@@ -82,6 +83,22 @@ if (forgedSaveResponse.ok || forgedSavePayload.success || forgedSavePayload.code
   throw new Error(`Expected forged token request to fail: ${JSON.stringify(forgedSavePayload)}`);
 }
 
+const missingUserToken = createToken({
+  gameKey: 'game_sample',
+  gameUserId: 999999,
+  platform: 'web'
+});
+const missingUserSaveResponse = await fetch(`${server.url}/api/save`, {
+  headers: {
+    Authorization: `Bearer ${missingUserToken}`
+  }
+});
+const missingUserSavePayload = await missingUserSaveResponse.json();
+
+if (missingUserSaveResponse.ok || missingUserSavePayload.success || missingUserSavePayload.code !== 'UNAUTHORIZED') {
+  throw new Error(`Expected missing-user token request to fail: ${JSON.stringify(missingUserSavePayload)}`);
+}
+
 const saveGetResponse = await fetch(`${server.url}/api/save`, {
   headers: {
     Authorization: `Bearer ${token}`
@@ -156,6 +173,7 @@ console.log(
       configVersion: configPayload.data.configVersion,
       incompatibleConfigCode: incompatibleConfigPayload.code,
       forgedTokenCode: forgedSavePayload.code,
+      missingUserTokenCode: missingUserSavePayload.code,
       initialSaveWasNull: true,
       savedCoins: savePostPayload.data.save.data.coins,
       adminUsers: adminUsersPayload.data.items.length

@@ -178,6 +178,7 @@ export async function startAdminBrowserApp(options: StartAdminBrowserAppOptions 
 
       case 'notice.setStatus': {
         const result = await setNoticeStatus({
+          gameKey: String(payload.gameKey ?? ''),
           id: Number(payload.id),
           status: String(payload.status ?? 'draft') as 'draft' | 'active' | 'archived'
         });

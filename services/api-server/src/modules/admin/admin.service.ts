@@ -216,10 +216,11 @@ export class AdminService {
   }
 
   setNoticeStatus(input: {
+    gameKey: string;
     id: number;
     status: 'draft' | 'active' | 'archived';
   }) {
-    const record = this.noticeRepository.setStatus(input.id, input.status);
+    const record = this.noticeRepository.setStatus(input.gameKey, input.id, input.status);
 
     if (!record) {
       return null;

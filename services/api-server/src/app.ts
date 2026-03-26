@@ -241,6 +241,25 @@ export function createApp(options: CreateAppOptions = {}): ApiApp {
   const rewardService = new RewardService(database, rewardLogRepository, userAssetBalanceRepository, adLogRepository);
   const saveService = new SaveService(userSaveRepository);
 
+  const validateClaims = (claims: AuthClaims): AuthClaims => {
+    const user = gameUserRepository.findById(claims.gameUserId);
+
+    if (!user || user.gameKey !== claims.gameKey || user.platform !== claims.platform || user.status !== 'active') {
+      throw new AppError(errorCodes.UNAUTHORIZED, 'invalid token');
+    }
+
+    return claims;
+  };
+
+  const requireAuthorizedClaims = (headers: HeadersInit | undefined): AuthClaims => {
+    return validateClaims(requireAuth(headers));
+  };
+
+  const resolveOptionalClaims = (headers: HeadersInit | undefined): AuthClaims | null => {
+    const claims = optionalAuth(headers);
+    return claims ? validateClaims(claims) : null;
+  };
+
   return {
     name: 'api-server',
     databaseFilePath: database.filePath,
@@ -283,11 +302,11 @@ export function createApp(options: CreateAppOptions = {}): ApiApp {
         }
 
         if (url.pathname === '/api/save' && method === 'GET') {
-          return json(saveService.getSave(requireAuth(init?.headers)));
+          return json(saveService.getSave(requireAuthorizedClaims(init?.headers)));
         }
 
         if (url.pathname === '/api/save' && method === 'POST') {
-          const claims = requireAuth(init?.headers);
+          const claims = requireAuthorizedClaims(init?.headers);
           const body = parseBody(init);
           return json(
             saveService.replaceSave(claims, {
@@ -308,15 +327,15 @@ export function createApp(options: CreateAppOptions = {}): ApiApp {
                 platform: String(body.platform ?? ''),
                 clientVersion: String(body.clientVersion ?? ''),
                 sessionId: String(body.sessionId ?? ''),
-                events: Array.isArray(body.events) ? (body.events as Array<{ eventName: string; eventData?: Record<string, unknown>; clientTime?: number }>) : []
+              events: Array.isArray(body.events) ? (body.events as Array<{ eventName: string; eventData?: Record<string, unknown>; clientTime?: number }>) : []
               },
-              optionalAuth(init?.headers)
+              resolveOptionalClaims(init?.headers)
             )
           );
         }
 
         if (url.pathname === '/api/ad/verify' && method === 'POST') {
-          const claims = requireAuth(init?.headers);
+          const claims = requireAuthorizedClaims(init?.headers);
           const body = parseBody(init);
           return json(
             adService.verify(claims, {
@@ -334,7 +353,7 @@ export function createApp(options: CreateAppOptions = {}): ApiApp {
         }
 
         if (url.pathname === '/api/reward/claim' && method === 'POST') {
-          const claims = requireAuth(init?.headers);
+          const claims = requireAuthorizedClaims(init?.headers);
           const body = parseBody(init);
           return json(
             rewardService.claim(claims, {
@@ -443,6 +462,7 @@ export function createApp(options: CreateAppOptions = {}): ApiApp {
           requireAdmin(init?.headers);
           const body = parseBody(init);
           const response = adminService.setNoticeStatus({
+            gameKey: readRequiredString(body, 'gameKey'),
             id: readRequiredNumber(body, 'id'),
             status: readConfigStatus(body, 'status')
           });

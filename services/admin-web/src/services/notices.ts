@@ -23,6 +23,7 @@ export interface SaveNoticeInput {
 }
 
 export interface SetNoticeStatusInput {
+  gameKey: string;
   id: number;
   status: 'draft' | 'active' | 'archived';
 }

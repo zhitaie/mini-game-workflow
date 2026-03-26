@@ -94,9 +94,22 @@ const updatedNotice = await saveNotice({
 });
 
 const activatedNotice = await setNoticeStatus({
+  gameKey: 'game_sample',
   id: createdNotice.item.id,
   status: 'active'
 });
+
+let wrongGameStatusError = null;
+
+try {
+  await setNoticeStatus({
+    gameKey: 'wrong_game',
+    id: createdNotice.item.id,
+    status: 'archived'
+  });
+} catch (error) {
+  wrongGameStatusError = error instanceof Error ? error.message : String(error);
+}
 
 const notices = await fetchNotices({
   gameKey: 'game_sample'
@@ -106,6 +119,10 @@ const notice = notices.items.find((item) => item.id === createdNotice.item.id);
 
 if (!notice || notice.title !== '运维公告已更新' || activatedNotice.item.status !== 'active') {
   throw new Error(`Unexpected notice mutation result: ${JSON.stringify({ updatedNotice, activatedNotice, notices })}`);
+}
+
+if (!wrongGameStatusError || !wrongGameStatusError.includes('notice not found')) {
+  throw new Error(`Expected wrong-game notice status mutation to fail: ${String(wrongGameStatusError)}`);
 }
 
 const noticesRender = await bootstrapAndRenderAdminApp({
@@ -136,6 +153,7 @@ console.log(
       archivedSeed,
       updatedNotice: updatedNotice.item,
       activatedNotice: activatedNotice.item,
+      wrongGameStatusError,
       renderedConfigContainsForm: true,
       renderedNoticeContainsEditForm: true
     },

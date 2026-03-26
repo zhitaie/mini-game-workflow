@@ -109,6 +109,47 @@ export class GameUserRepository {
     };
   }
 
+  findById(id: number): GameUserRecord | null {
+    const row = this.database.sqlite
+      .prepare(
+        `
+          SELECT id, game_key, platform, platform_open_id, nickname, avatar, status, created_at, last_login_at
+          FROM game_user
+          WHERE id = ?
+          LIMIT 1
+        `
+      )
+      .get(id) as
+      | {
+          id: number;
+          game_key: string;
+          platform: string;
+          platform_open_id: string;
+          nickname: string;
+          avatar: string;
+          status: 'active';
+          created_at: number;
+          last_login_at: number;
+        }
+      | undefined;
+
+    if (!row) {
+      return null;
+    }
+
+    return {
+      id: row.id,
+      gameKey: row.game_key,
+      platform: row.platform,
+      platformOpenId: row.platform_open_id,
+      nickname: row.nickname,
+      avatar: row.avatar,
+      status: row.status,
+      createdAt: row.created_at,
+      lastLoginAt: row.last_login_at
+    };
+  }
+
   list(filters: {
     gameKey?: string;
     platform?: string;

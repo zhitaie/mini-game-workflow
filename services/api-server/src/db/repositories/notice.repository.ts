@@ -84,16 +84,16 @@ export class NoticeRepository {
     return this.findById(input.id);
   }
 
-  setStatus(id: number, status: NoticeRecord['status'], updatedAt = Date.now()): NoticeRecord | null {
+  setStatus(gameKey: string, id: number, status: NoticeRecord['status'], updatedAt = Date.now()): NoticeRecord | null {
     const result = this.database.sqlite
       .prepare(
         `
           UPDATE notice
           SET status = ?, updated_at = ?
-          WHERE id = ?
+          WHERE id = ? AND game_key = ?
         `
       )
-      .run(status, updatedAt, id);
+      .run(status, updatedAt, id, gameKey);
 
     if (result.changes === 0) {
       return null;

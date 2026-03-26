@@ -170,6 +170,7 @@ export async function NoticesPage(context: AdminPageLoaderContext): Promise<Admi
                   tone: 'primary' as const,
                   confirmText: '确认将这条公告切换为 active？',
                   payload: {
+                    gameKey: context.gameKey,
                     id: notice.id,
                     status: 'active'
                   }
@@ -185,6 +186,7 @@ export async function NoticesPage(context: AdminPageLoaderContext): Promise<Admi
                   tone: 'danger' as const,
                   confirmText: '确认归档这条公告？归档后客户端将不再读取。',
                   payload: {
+                    gameKey: context.gameKey,
                     id: notice.id,
                     status: 'archived'
                   }
