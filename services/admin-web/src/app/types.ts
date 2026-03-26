@@ -98,6 +98,7 @@ export interface AdminQueryFormSection {
   description: string;
   route?: AdminRoutePath;
   submitLabel: string;
+  resetLabel?: string;
   fields: AdminFormField[];
 }
 
@@ -135,6 +136,7 @@ export interface AdminRouteDefinition {
 export interface AdminAppSnapshot {
   gameKey: string;
   currentRoute: AdminRoutePath;
+  currentQuery?: Record<string, string | number | boolean | undefined>;
   navigation: AdminNavItem[];
   page: AdminPageModel;
 }

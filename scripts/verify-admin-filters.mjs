@@ -164,6 +164,18 @@ if (!rendered.html.includes('data-admin-form-kind="query"') || !rendered.html.in
   throw new Error(`Expected query form markers in rendered admin html: ${rendered.html}`);
 }
 
+if (!rendered.html.includes('清空筛选') || !rendered.html.includes('#/ad-logs?gameKey=game_sample')) {
+  throw new Error(`Expected reset filter link in rendered admin html: ${rendered.html}`);
+}
+
+if (!rendered.html.includes('#/reward-logs?gameKey=game_sample&amp;gameUserId=1')) {
+  throw new Error(`Expected reward log nav context in rendered admin html: ${rendered.html}`);
+}
+
+if (!rendered.html.includes('#/analytics?gameKey=game_sample&amp;gameUserId=1')) {
+  throw new Error(`Expected analytics nav context in rendered admin html: ${rendered.html}`);
+}
+
 console.log(
   JSON.stringify(
     {
@@ -174,7 +186,9 @@ console.log(
       filteredAnalytics: analyticsPage.page.table.rows.length,
       configsFormKinds: configsPage.page.forms.map((form) => form.kind),
       noticesFormKinds: noticesPage.page.forms.map((form) => form.kind),
-      renderedContainsQueryForm: true
+      renderedContainsQueryForm: true,
+      renderedContainsResetLink: true,
+      renderedPreservesUserContextAcrossNav: true
     },
     null,
     2

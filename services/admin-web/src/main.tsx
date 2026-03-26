@@ -35,6 +35,7 @@ export async function bootstrapAdminApp(options: BootstrapAdminAppOptions): Prom
   return {
     gameKey: options.gameKey,
     currentRoute,
+    currentQuery: options.query,
     navigation: adminRoutes.map((item) => ({
       path: item.path,
       label: item.label,

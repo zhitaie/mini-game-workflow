@@ -12,6 +12,15 @@ import type {
   AdminTableSection
 } from './types.js';
 
+const ROUTE_CONTEXT_KEYS: Record<string, string[]> = {
+  '/users': ['platform', 'platformOpenId', 'status'],
+  '/configs': ['platform', 'status'],
+  '/notices': ['status'],
+  '/ad-logs': ['gameUserId', 'sceneKey', 'verified', 'completed'],
+  '/reward-logs': ['gameUserId', 'rewardType', 'reason', 'bizId'],
+  '/analytics': ['gameUserId', 'eventName']
+};
+
 function escapeHtml(value: string): string {
   return value
     .replace(/&/g, '&amp;')
@@ -161,7 +170,19 @@ function renderField(sectionTitle: string, field: AdminFormSection['fields'][num
   `;
 }
 
-function renderForms(currentPath: string, forms: AdminFormSection[] | undefined): string {
+function pickRouteQuery(
+  path: string,
+  query: Record<string, string | number | boolean | undefined> | undefined
+): Record<string, string | number | boolean | undefined> {
+  if (!query) {
+    return {};
+  }
+
+  const allowedKeys = ROUTE_CONTEXT_KEYS[path] ?? [];
+  return Object.fromEntries(Object.entries(query).filter(([key]) => allowedKeys.includes(key)));
+}
+
+function renderForms(gameKey: string, currentPath: string, forms: AdminFormSection[] | undefined): string {
   if (!forms || forms.length === 0) {
     return '';
   }
@@ -191,6 +212,18 @@ function renderForms(currentPath: string, forms: AdminFormSection[] | undefined)
                   <button class="admin-button ${form.kind === 'mutation' ? 'admin-button-primary' : 'admin-button-default'}" type="submit">
                     ${escapeHtml(form.submitLabel)}
                   </button>
+                  ${
+                    form.kind === 'query'
+                      ? `
+                        <a
+                          class="admin-link-action admin-link-action-secondary"
+                          href="${escapeHtml(createAdminHash(gameKey, form.route ?? currentPath))}"
+                        >
+                          ${escapeHtml(form.resetLabel ?? '清空筛选')}
+                        </a>
+                      `
+                      : ''
+                  }
                 </div>
               </form>
             </section>
@@ -323,8 +356,9 @@ function renderNavigation(snapshot: AdminAppSnapshot): string {
         ${snapshot.navigation
           .map((item) => {
             const activeClass = item.path === snapshot.currentRoute ? ' is-active' : '';
+            const linkedQuery = pickRouteQuery(item.path, snapshot.currentQuery);
             return `
-              <a class="admin-nav-item${activeClass}" href="${escapeHtml(createAdminHash(snapshot.gameKey, item.path))}">
+              <a class="admin-nav-item${activeClass}" href="${escapeHtml(createAdminHash(snapshot.gameKey, item.path, linkedQuery))}">
                 <span class="admin-nav-label">${escapeHtml(item.label)}</span>
                 <span class="admin-nav-desc">${escapeHtml(item.description)}</span>
               </a>
@@ -598,6 +632,8 @@ export function getAdminShellStyles(): string {
       margin-top: 16px;
       display: flex;
       justify-content: flex-start;
+      gap: 10px;
+      flex-wrap: wrap;
     }
 
     .admin-table-wrap {
@@ -655,6 +691,12 @@ export function getAdminShellStyles(): string {
       background: var(--admin-accent-soft);
       color: var(--admin-accent);
       border: 1px solid transparent;
+    }
+
+    .admin-link-action-secondary {
+      padding: 10px 16px;
+      background: rgba(31, 42, 42, 0.06);
+      color: var(--admin-ink);
     }
 
     .admin-button {
@@ -732,7 +774,7 @@ export function renderAdminSnapshot(snapshot: AdminAppSnapshot): string {
         ${renderBanner(snapshot.page.banner)}
         ${renderFilters(snapshot.page.filters)}
         ${renderMetrics(snapshot.page.metrics)}
-        ${renderForms(snapshot.page.path, snapshot.page.forms)}
+        ${renderForms(snapshot.gameKey, snapshot.page.path, snapshot.page.forms)}
         ${renderTable(snapshot.gameKey, snapshot.page.table)}
         ${renderNotes(snapshot.page.notes)}
       </main>
