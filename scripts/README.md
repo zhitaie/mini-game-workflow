@@ -7,4 +7,5 @@
 - `init-dev-db`
 - `verify-minimal-flow`
 - `verify-admin-flow`
+- `verify-admin-shell`
 - `verify-persistence-flow`
