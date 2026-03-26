@@ -5,10 +5,10 @@
   "type": "module",
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "start": "node dist/services/api-server/src/cli.js"
   },
   "dependencies": {
     "@mini-game-workflow/game-core-types": "workspace:*"
   }
 }
-

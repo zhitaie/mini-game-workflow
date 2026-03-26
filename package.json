@@ -6,7 +6,9 @@
   "scripts": {
     "build": "pnpm -r run build",
     "typecheck": "pnpm -r run typecheck",
+    "serve:api": "node services/api-server/dist/services/api-server/src/cli.js",
     "db:init": "node --experimental-specifier-resolution=node scripts/init-dev-db.mjs",
+    "verify:http": "node --experimental-specifier-resolution=node scripts/verify-http-server.mjs",
     "verify:minimal": "node --experimental-specifier-resolution=node scripts/verify-minimal-flow.mjs",
     "verify:admin": "node --experimental-specifier-resolution=node scripts/verify-admin-flow.mjs",
     "verify:admin-filters": "node --experimental-specifier-resolution=node scripts/verify-admin-filters.mjs",
