@@ -12,6 +12,7 @@
     "verify:dev-stack": "node --experimental-specifier-resolution=node scripts/verify-dev-stack.mjs",
     "verify:http": "node --experimental-specifier-resolution=node scripts/verify-http-server.mjs",
     "verify:sample-browser": "node --experimental-specifier-resolution=node scripts/verify-game-sample-browser.mjs",
+    "verify:save-migration": "node --experimental-specifier-resolution=node scripts/verify-save-manager-migration.mjs",
     "verify:minimal": "node --experimental-specifier-resolution=node scripts/verify-minimal-flow.mjs",
     "verify:admin": "node --experimental-specifier-resolution=node scripts/verify-admin-flow.mjs",
     "verify:admin-filters": "node --experimental-specifier-resolution=node scripts/verify-admin-filters.mjs",

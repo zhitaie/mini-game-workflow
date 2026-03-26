@@ -24,9 +24,15 @@ export class AnalyticsService {
   }
 
   accept(input: AnalyticsInput, claims: AuthClaims | null) {
+    if (claims && claims.gameKey !== input.gameKey) {
+      throw new Error(`Token game mismatch: ${claims.gameKey} !== ${input.gameKey}`);
+    }
+
+    const effectiveGameKey = claims?.gameKey ?? input.gameKey;
+
     this.analyticsEventRepository.append(
       input.events.map((event) => ({
-        gameKey: input.gameKey,
+        gameKey: effectiveGameKey,
         gameUserId: claims?.gameUserId ?? null,
         eventName: event.eventName,
         eventData: event.eventData ?? {},

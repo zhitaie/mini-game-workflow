@@ -60,12 +60,24 @@ function requireAuth(headers: HeadersInit | undefined): AuthClaims {
     throw new AppError(errorCodes.UNAUTHORIZED, 'missing token');
   }
 
-  return decodeToken(token);
+  try {
+    return decodeToken(token);
+  } catch {
+    throw new AppError(errorCodes.UNAUTHORIZED, 'invalid token');
+  }
 }
 
 function optionalAuth(headers: HeadersInit | undefined): AuthClaims | null {
   const token = readToken(headers);
-  return token ? decodeToken(token) : null;
+  if (!token) {
+    return null;
+  }
+
+  try {
+    return decodeToken(token);
+  } catch {
+    return null;
+  }
 }
 
 function requireAdmin(headers: HeadersInit | undefined): void {
@@ -487,6 +499,17 @@ export function createApp(options: CreateAppOptions = {}): ApiApp {
 
         if (error instanceof Error && error.message.startsWith('Invalid verification id')) {
           return json(fail(errorCodes.AD_VERIFY_FAILED, error.message), 400);
+        }
+
+        if (error instanceof Error && error.message.startsWith('Token game mismatch')) {
+          return json(fail(errorCodes.TOKEN_GAME_MISMATCH, error.message), 400);
+        }
+
+        if (
+          error instanceof Error &&
+          (error.message.startsWith('No active config') || error.message.startsWith('Client version '))
+        ) {
+          return json(fail(errorCodes.BAD_REQUEST, error.message), 400);
         }
 
         const message = error instanceof Error ? error.message : 'internal error';

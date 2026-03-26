@@ -4,5 +4,5 @@ export interface SaveManager<TData> {
   init(): Promise<void>;
   getAll(): Readonly<SaveEnvelope<TData>>;
   replace(data: TData): Promise<void>;
+  restore(envelope: SaveEnvelope<TData>): Promise<void>;
 }
-

@@ -39,7 +39,7 @@ export class RewardService {
         }
 
         const adLog = this.adLogRepository.findByVerificationId(claims.gameKey, input.bizId);
-        if (!adLog || !adLog.verified || !adLog.completed) {
+        if (!adLog || !adLog.verified || !adLog.completed || adLog.gameUserId !== claims.gameUserId) {
           throw new Error(`Invalid verification id: ${input.bizId}`);
         }
 

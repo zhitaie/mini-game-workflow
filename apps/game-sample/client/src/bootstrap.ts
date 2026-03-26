@@ -132,7 +132,7 @@ export async function bootstrapGameSample(options: BootstrapGameSampleOptions = 
   });
 
   if (remoteSave.save) {
-    await save.replace(remoteSave.save.data);
+    await save.restore(remoteSave.save);
   } else {
     const current = save.getAll();
     await network.request<RemoteSaveResponse>({

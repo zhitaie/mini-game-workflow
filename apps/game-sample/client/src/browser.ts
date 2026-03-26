@@ -425,7 +425,7 @@ export async function startGameSampleBrowserApp(options: StartGameSampleBrowserA
         });
 
         if (remoteSave.save) {
-          await result.runtime.save.replace(remoteSave.save.data);
+          await result.runtime.save.restore(remoteSave.save);
           lastMessage = '已从真实 API 重新拉取云存档。';
         } else {
           lastMessage = '当前服务端还没有存档记录。';

@@ -132,8 +132,52 @@ async function main(): Promise<void> {
     }
   });
 
+  const secondLoginResponse = await app.fetch('http://local.app/api/auth/login', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      gameKey: 'game_sample',
+      platform: 'web',
+      code: 'verify-flow-second-user',
+      clientVersion: '0.1.0'
+    })
+  });
+  const secondLoginPayload = (await secondLoginResponse.json()) as {
+    success: boolean;
+    data: {
+      token: string;
+      user: {
+        id: number;
+      };
+    };
+  };
+
+  const rewardHijackResponse = await app.fetch('http://local.app/api/reward/claim', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${secondLoginPayload.data.token}`
+    },
+    body: JSON.stringify({
+      rewardType: 'gold',
+      amount: 100,
+      reason: 'reward_ad',
+      bizId: verification.verificationId
+    })
+  });
+  const rewardHijackPayload = (await rewardHijackResponse.json()) as {
+    success: boolean;
+    code: string;
+  };
+
   if (reward.balanceAfter !== 100 || rewardDuplicate.balanceAfter !== 100) {
     throw new Error(`Unexpected reward balance: ${JSON.stringify({ reward, rewardDuplicate })}`);
+  }
+
+  if (rewardHijackResponse.ok || rewardHijackPayload.success || rewardHijackPayload.code !== 'AD_VERIFY_FAILED') {
+    throw new Error(`Expected cross-user reward claim to fail: ${JSON.stringify(rewardHijackPayload)}`);
   }
 
   console.log(
@@ -147,7 +191,8 @@ async function main(): Promise<void> {
         save: roundTrip.save,
         verification,
         reward,
-        rewardDuplicate
+        rewardDuplicate,
+        rewardHijack: rewardHijackPayload
       },
       null,
       2

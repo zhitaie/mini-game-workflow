@@ -27,6 +27,9 @@ export function createSaveManager<TData>(definition: SaveDefinition<TData>): Sav
         data,
         updatedAt: Date.now()
       };
+    },
+    async restore(envelope: SaveEnvelope<TData>): Promise<void> {
+      save = definition.migrate(envelope);
     }
   };
 }

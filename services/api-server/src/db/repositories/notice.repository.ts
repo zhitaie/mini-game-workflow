@@ -72,19 +72,16 @@ export class NoticeRepository {
             start_time = ?,
             end_time = ?,
             updated_at = ?
-          WHERE id = ?
+          WHERE id = ? AND game_key = ?
         `
       )
-      .run(input.title, input.content, input.status, input.startTime, input.endTime, updatedAt, input.id);
+      .run(input.title, input.content, input.status, input.startTime, input.endTime, updatedAt, input.id, input.gameKey);
 
     if (result.changes === 0) {
       return null;
     }
 
-    return {
-      ...input,
-      updatedAt
-    };
+    return this.findById(input.id);
   }
 
   setStatus(id: number, status: NoticeRecord['status'], updatedAt = Date.now()): NoticeRecord | null {

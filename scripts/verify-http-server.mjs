@@ -58,6 +58,30 @@ if (!configResponse.ok || !configPayload.success || configPayload.data?.configVe
   throw new Error(`Unexpected config payload: ${JSON.stringify(configPayload)}`);
 }
 
+const incompatibleConfigResponse = await fetch(
+  `${server.url}/api/config?gameKey=game_sample&platform=web&clientVersion=1.0.0`
+);
+const incompatibleConfigPayload = await incompatibleConfigResponse.json();
+
+if (
+  incompatibleConfigResponse.ok ||
+  incompatibleConfigPayload.success ||
+  incompatibleConfigPayload.code !== 'BAD_REQUEST'
+) {
+  throw new Error(`Expected incompatible config request to fail: ${JSON.stringify(incompatibleConfigPayload)}`);
+}
+
+const forgedSaveResponse = await fetch(`${server.url}/api/save`, {
+  headers: {
+    Authorization: 'Bearer game_sample:1:web'
+  }
+});
+const forgedSavePayload = await forgedSaveResponse.json();
+
+if (forgedSaveResponse.ok || forgedSavePayload.success || forgedSavePayload.code !== 'UNAUTHORIZED') {
+  throw new Error(`Expected forged token request to fail: ${JSON.stringify(forgedSavePayload)}`);
+}
+
 const saveGetResponse = await fetch(`${server.url}/api/save`, {
   headers: {
     Authorization: `Bearer ${token}`
@@ -130,6 +154,8 @@ console.log(
       databaseFilePath,
       health,
       configVersion: configPayload.data.configVersion,
+      incompatibleConfigCode: incompatibleConfigPayload.code,
+      forgedTokenCode: forgedSavePayload.code,
       initialSaveWasNull: true,
       savedCoins: savePostPayload.data.save.data.coins,
       adminUsers: adminUsersPayload.data.items.length

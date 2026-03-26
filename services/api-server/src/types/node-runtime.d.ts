@@ -36,6 +36,16 @@ declare module 'node:http' {
   ): Server;
 }
 
+declare module 'node:crypto' {
+  export interface Hmac {
+    update(data: string): Hmac;
+    digest(encoding: 'base64url'): string;
+  }
+
+  export function createHmac(algorithm: string, key: string): Hmac;
+  export function timingSafeEqual(left: Uint8Array, right: Uint8Array): boolean;
+}
+
 declare module 'node:path' {
   export function dirname(path: string): string;
   export function resolve(...paths: string[]): string;
@@ -65,4 +75,10 @@ declare const process: {
   env: Record<string, string | undefined>;
   argv: string[];
   exitCode?: number;
+};
+
+declare const Buffer: {
+  from(data: string, encoding?: 'utf8' | 'base64url'): Uint8Array & {
+    toString(encoding?: 'utf8' | 'base64url'): string;
+  };
 };
