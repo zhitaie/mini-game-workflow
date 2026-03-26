@@ -10,6 +10,7 @@
     "verify:minimal": "node --experimental-specifier-resolution=node scripts/verify-minimal-flow.mjs",
     "verify:admin": "node --experimental-specifier-resolution=node scripts/verify-admin-flow.mjs",
     "verify:admin-shell": "node --experimental-specifier-resolution=node scripts/verify-admin-shell.mjs",
+    "verify:admin-render": "node --experimental-specifier-resolution=node scripts/verify-admin-render.mjs",
     "verify:persistence": "node --experimental-specifier-resolution=node scripts/verify-persistence-flow.mjs"
   },
   "devDependencies": {

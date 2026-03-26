@@ -83,3 +83,12 @@ export interface AdminAppSnapshot {
   navigation: AdminNavItem[];
   page: AdminPageModel;
 }
+
+export interface AdminRenderTarget {
+  innerHTML: string;
+}
+
+export interface AdminRenderResult {
+  snapshot: AdminAppSnapshot;
+  html: string;
+}

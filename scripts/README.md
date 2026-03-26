@@ -8,4 +8,5 @@
 - `verify-minimal-flow`
 - `verify-admin-flow`
 - `verify-admin-shell`
+- `verify-admin-render`
 - `verify-persistence-flow`
