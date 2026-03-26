@@ -1,3 +1,3 @@
-import { bootstrapGameSample } from './bootstrap.js';
+import { startGameSampleBrowserApp } from './browser.js';
 
-void bootstrapGameSample();
+void startGameSampleBrowserApp();

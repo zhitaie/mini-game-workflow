@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Game Sample Browser</title>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script>
+      window.__MINI_GAME_SAMPLE__ = {
+        baseURL: 'http://127.0.0.1:3000',
+        containerSelector: '#app'
+      };
+    </script>
+    <script type="module">
+      import { startGameSampleBrowserApp } from './dist/apps/game-sample/client/src/browser.js';
+
+      startGameSampleBrowserApp();
+    </script>
+  </body>
+</html>
