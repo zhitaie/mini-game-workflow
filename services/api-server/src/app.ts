@@ -89,6 +89,104 @@ function parseBody(init?: RequestInit): Record<string, unknown> {
   throw new AppError(errorCodes.BAD_REQUEST, 'unsupported request body');
 }
 
+function readRequiredString(body: Record<string, unknown>, key: string): string {
+  const value = body[key];
+
+  if (typeof value !== 'string' || value.trim() === '') {
+    throw new AppError(errorCodes.BAD_REQUEST, `invalid ${key}`);
+  }
+
+  return value.trim();
+}
+
+function readOptionalString(body: Record<string, unknown>, key: string): string | undefined {
+  const value = body[key];
+
+  if (value === undefined || value === null || value === '') {
+    return undefined;
+  }
+
+  if (typeof value !== 'string') {
+    throw new AppError(errorCodes.BAD_REQUEST, `invalid ${key}`);
+  }
+
+  return value.trim() || undefined;
+}
+
+function readOptionalTimestamp(body: Record<string, unknown>, key: string): number | null {
+  const value = body[key];
+
+  if (value === undefined || value === null || value === '') {
+    return null;
+  }
+
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value;
+  }
+
+  if (typeof value === 'string') {
+    const parsed = Date.parse(value);
+
+    if (!Number.isNaN(parsed)) {
+      return parsed;
+    }
+  }
+
+  throw new AppError(errorCodes.BAD_REQUEST, `invalid ${key}`);
+}
+
+function readOptionalNumber(body: Record<string, unknown>, key: string): number | undefined {
+  const value = body[key];
+
+  if (value === undefined || value === null || value === '') {
+    return undefined;
+  }
+
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value;
+  }
+
+  if (typeof value === 'string') {
+    const parsed = Number(value);
+
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+
+  throw new AppError(errorCodes.BAD_REQUEST, `invalid ${key}`);
+}
+
+function readRequiredNumber(body: Record<string, unknown>, key: string): number {
+  const value = readOptionalNumber(body, key);
+
+  if (value === undefined) {
+    throw new AppError(errorCodes.BAD_REQUEST, `invalid ${key}`);
+  }
+
+  return value;
+}
+
+function readRecord(body: Record<string, unknown>, key: string): Record<string, unknown> {
+  const value = body[key];
+
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new AppError(errorCodes.BAD_REQUEST, `invalid ${key}`);
+  }
+
+  return value as Record<string, unknown>;
+}
+
+function readConfigStatus(body: Record<string, unknown>, key: string): 'draft' | 'active' | 'archived' {
+  const value = body[key];
+
+  if (value === 'draft' || value === 'active' || value === 'archived') {
+    return value;
+  }
+
+  throw new AppError(errorCodes.BAD_REQUEST, `invalid ${key}`);
+}
+
 export interface ApiApp {
   name: string;
   databaseFilePath: string;
@@ -264,6 +362,41 @@ export function createApp(options: CreateAppOptions = {}): ApiApp {
           );
         }
 
+        if (url.pathname === '/api/admin/configs/draft' && method === 'POST') {
+          requireAdmin(init?.headers);
+          const body = parseBody(init);
+          const response = adminService.saveConfigDraft({
+            gameKey: readRequiredString(body, 'gameKey'),
+            platform: readRequiredString(body, 'platform'),
+            configVersion: readRequiredString(body, 'configVersion'),
+            minClientVersion: readOptionalString(body, 'minClientVersion'),
+            maxClientVersion: readOptionalString(body, 'maxClientVersion'),
+            payload: readRecord(body, 'payload')
+          });
+
+          if (!response) {
+            throw new AppError(errorCodes.BAD_REQUEST, 'config version is already active and cannot be rewritten as draft');
+          }
+
+          return json(response);
+        }
+
+        if (url.pathname === '/api/admin/configs/publish' && method === 'POST') {
+          requireAdmin(init?.headers);
+          const body = parseBody(init);
+          const response = adminService.publishConfig({
+            gameKey: readRequiredString(body, 'gameKey'),
+            platform: readRequiredString(body, 'platform'),
+            configVersion: readRequiredString(body, 'configVersion')
+          });
+
+          if (!response) {
+            throw new AppError(errorCodes.BAD_REQUEST, 'config version not found');
+          }
+
+          return json(response);
+        }
+
         if (url.pathname === '/api/admin/notices' && method === 'GET') {
           requireAdmin(init?.headers);
           return json(
@@ -272,6 +405,41 @@ export function createApp(options: CreateAppOptions = {}): ApiApp {
               status: (url.searchParams.get('status') as 'draft' | 'active' | 'archived' | null) ?? undefined
             })
           );
+        }
+
+        if (url.pathname === '/api/admin/notices/save' && method === 'POST') {
+          requireAdmin(init?.headers);
+          const body = parseBody(init);
+          const response = adminService.saveNotice({
+            id: readOptionalNumber(body, 'id'),
+            gameKey: readRequiredString(body, 'gameKey'),
+            title: readRequiredString(body, 'title'),
+            content: readRequiredString(body, 'content'),
+            status: readConfigStatus(body, 'status'),
+            startTime: readOptionalTimestamp(body, 'startTime'),
+            endTime: readOptionalTimestamp(body, 'endTime')
+          });
+
+          if (!response) {
+            throw new AppError(errorCodes.BAD_REQUEST, 'notice not found');
+          }
+
+          return json(response);
+        }
+
+        if (url.pathname === '/api/admin/notices/status' && method === 'POST') {
+          requireAdmin(init?.headers);
+          const body = parseBody(init);
+          const response = adminService.setNoticeStatus({
+            id: readRequiredNumber(body, 'id'),
+            status: readConfigStatus(body, 'status')
+          });
+
+          if (!response) {
+            throw new AppError(errorCodes.BAD_REQUEST, 'notice not found');
+          }
+
+          return json(response);
         }
 
         if (url.pathname === '/api/admin/ad-logs' && method === 'GET') {

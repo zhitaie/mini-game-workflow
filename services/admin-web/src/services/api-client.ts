@@ -7,7 +7,9 @@ export interface AdminApiClientContext {
 }
 
 export interface AdminRequestOptions {
+  method?: 'GET' | 'POST';
   query?: object;
+  body?: unknown;
 }
 
 let context: AdminApiClientContext | null = null;
@@ -37,10 +39,12 @@ export async function request<TData>(path: string, options: AdminRequestOptions 
 
   const fetchImpl = context.fetchImpl ?? fetch;
   const response = await fetchImpl(buildURL(context.baseURL, path, options.query), {
+    method: options.method ?? 'GET',
     headers: {
       'Content-Type': 'application/json',
       'x-admin-token': context.adminToken
-    }
+    },
+    body: options.body === undefined ? undefined : JSON.stringify(options.body)
   });
 
   const payload = (await response.json()) as ApiResponse<TData>;

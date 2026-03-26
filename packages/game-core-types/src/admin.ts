@@ -3,6 +3,10 @@ export interface AdminListResult<TItem> {
   total: number;
 }
 
+export interface AdminItemResult<TItem> {
+  item: TItem;
+}
+
 export interface AdminDashboardSummary {
   gameKey: string;
   totalUsers: number;
@@ -31,6 +35,7 @@ export interface AdminConfigItem {
   configVersion: string;
   minClientVersion?: string;
   maxClientVersion?: string;
+  payload: Record<string, unknown>;
   status: 'draft' | 'active' | 'archived';
   updatedAt: number;
 }

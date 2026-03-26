@@ -44,6 +44,67 @@ export class NoticeRepository {
     return record;
   }
 
+  findById(id: number): NoticeRecord | null {
+    const row = this.database.sqlite
+      .prepare(
+        `
+          SELECT id, game_key, title, content, status, start_time, end_time, updated_at
+          FROM notice
+          WHERE id = ?
+          LIMIT 1
+        `
+      )
+      .get(id) as NoticeRow | undefined;
+
+    return row ? this.mapRow(row) : null;
+  }
+
+  update(input: Omit<NoticeRecord, 'updatedAt'> & { updatedAt?: number }): NoticeRecord | null {
+    const updatedAt = input.updatedAt ?? Date.now();
+    const result = this.database.sqlite
+      .prepare(
+        `
+          UPDATE notice
+          SET
+            title = ?,
+            content = ?,
+            status = ?,
+            start_time = ?,
+            end_time = ?,
+            updated_at = ?
+          WHERE id = ?
+        `
+      )
+      .run(input.title, input.content, input.status, input.startTime, input.endTime, updatedAt, input.id);
+
+    if (result.changes === 0) {
+      return null;
+    }
+
+    return {
+      ...input,
+      updatedAt
+    };
+  }
+
+  setStatus(id: number, status: NoticeRecord['status'], updatedAt = Date.now()): NoticeRecord | null {
+    const result = this.database.sqlite
+      .prepare(
+        `
+          UPDATE notice
+          SET status = ?, updated_at = ?
+          WHERE id = ?
+        `
+      )
+      .run(status, updatedAt, id);
+
+    if (result.changes === 0) {
+      return null;
+    }
+
+    return this.findById(id);
+  }
+
   list(filters: {
     gameKey?: string;
     status?: NoticeRecord['status'];
@@ -70,27 +131,9 @@ export class NoticeRepository {
           ORDER BY updated_at DESC
         `
       )
-      .all(...values) as Array<{
-      id: number;
-      game_key: string;
-      title: string;
-      content: string;
-      status: 'draft' | 'active' | 'archived';
-      start_time: number | null;
-      end_time: number | null;
-      updated_at: number;
-    }>;
+      .all(...values) as NoticeRow[];
 
-    return rows.map((row) => ({
-      id: row.id,
-      gameKey: row.game_key,
-      title: row.title,
-      content: row.content,
-      status: row.status,
-      startTime: row.start_time,
-      endTime: row.end_time,
-      updatedAt: row.updated_at
-    }));
+    return rows.map((row) => this.mapRow(row));
   }
 
   listActive(gameKey: string, now = Date.now()): NoticeRecord[] {
@@ -109,4 +152,28 @@ export class NoticeRepository {
       return true;
     });
   }
+
+  private mapRow(row: NoticeRow): NoticeRecord {
+    return {
+      id: row.id,
+      gameKey: row.game_key,
+      title: row.title,
+      content: row.content,
+      status: row.status,
+      startTime: row.start_time,
+      endTime: row.end_time,
+      updatedAt: row.updated_at
+    };
+  }
+}
+
+interface NoticeRow {
+  id: number;
+  game_key: string;
+  title: string;
+  content: string;
+  status: 'draft' | 'active' | 'archived';
+  start_time: number | null;
+  end_time: number | null;
+  updated_at: number;
 }

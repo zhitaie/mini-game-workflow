@@ -2,6 +2,15 @@ import { formatTimestamp, stringifyValue } from '../../app/format.js';
 import type { AdminPageLoaderContext, AdminPageModel } from '../../app/types.js';
 import { fetchConfigs } from '../../services/configs.js';
 
+function prettyJson(value: Record<string, unknown>): string {
+  return JSON.stringify(value, null, 2);
+}
+
+function summarizeJson(value: Record<string, unknown>): string {
+  const raw = JSON.stringify(value);
+  return raw.length > 72 ? `${raw.slice(0, 69)}...` : raw;
+}
+
 export async function ConfigsPage(context: AdminPageLoaderContext): Promise<AdminPageModel> {
   const configs = await fetchConfigs({
     gameKey: context.gameKey,
@@ -28,13 +37,68 @@ export async function ConfigsPage(context: AdminPageLoaderContext): Promise<Admi
         value: stringifyValue(typeof context.query?.platform === 'string' ? context.query.platform : undefined) || 'all'
       }
     ],
+    forms: [
+      {
+        title: '保存草稿配置',
+        description: '先保存 draft，再通过列表动作发布为 active。首期只支持 JSON 对象 payload。',
+        action: 'config.saveDraft',
+        submitLabel: '保存草稿',
+        fields: [
+          {
+            key: 'gameKey',
+            label: 'Game Key',
+            type: 'hidden',
+            value: context.gameKey
+          },
+          {
+            key: 'platform',
+            label: '平台',
+            type: 'text',
+            value: typeof context.query?.platform === 'string' ? context.query.platform : 'web',
+            required: true
+          },
+          {
+            key: 'configVersion',
+            label: '配置版本',
+            type: 'text',
+            placeholder: '例如 web-v2',
+            required: true
+          },
+          {
+            key: 'minClientVersion',
+            label: '最小客户端版本',
+            type: 'text',
+            placeholder: '例如 0.2.0'
+          },
+          {
+            key: 'maxClientVersion',
+            label: '最大客户端版本',
+            type: 'text',
+            placeholder: '例如 0.9.99'
+          },
+          {
+            key: 'payloadJson',
+            label: 'Payload JSON',
+            type: 'textarea',
+            rows: 8,
+            required: true,
+            value: prettyJson({
+              ad: {
+                enabled: true
+              }
+            })
+          }
+        ]
+      }
+    ],
     table: {
       title: '配置版本',
-      description: '当前先做查询壳，后续再往发布动作延展。',
+      description: '草稿和已发布版本都在这里查看，只有 draft 允许直接发布。',
       columns: [
         { key: 'platform', label: '平台' },
         { key: 'configVersion', label: '配置版本' },
         { key: 'status', label: '状态' },
+        { key: 'payload', label: '配置摘要' },
         { key: 'minClientVersion', label: '最小客户端版本' },
         { key: 'maxClientVersion', label: '最大客户端版本' },
         { key: 'updatedAt', label: '更新时间' }
@@ -45,10 +109,27 @@ export async function ConfigsPage(context: AdminPageLoaderContext): Promise<Admi
           platform: config.platform,
           configVersion: config.configVersion,
           status: config.status,
+          payload: summarizeJson(config.payload),
           minClientVersion: config.minClientVersion ?? '-',
           maxClientVersion: config.maxClientVersion ?? '-',
           updatedAt: formatTimestamp(config.updatedAt)
-        }
+        },
+        actions:
+          config.status === 'draft'
+            ? [
+                {
+                  kind: 'submit',
+                  label: '发布',
+                  action: 'config.publish',
+                  tone: 'primary',
+                  payload: {
+                    gameKey: config.gameKey,
+                    platform: config.platform,
+                    configVersion: config.configVersion
+                  }
+                }
+              ]
+            : undefined
       })),
       emptyText: '当前筛选条件下没有配置记录。'
     },
@@ -57,7 +138,8 @@ export async function ConfigsPage(context: AdminPageLoaderContext): Promise<Admi
         title: '页面约束',
         lines: [
           '配置页必须区分 draft / active / archived。',
-          '配置页只能操作远程运行配置，不能覆盖接入声明。'
+          '配置页只能操作远程运行配置，不能覆盖接入声明。',
+          'active 版本一旦发布，不允许直接改写成 draft；如需调整，应新建版本。'
         ]
       }
     ]

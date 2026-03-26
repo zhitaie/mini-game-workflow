@@ -1,11 +1,14 @@
 import { stringifyValue } from './format.js';
 import type {
   AdminAppSnapshot,
+  AdminBanner,
   AdminFilterChip,
+  AdminFormSection,
   AdminLinkAction,
   AdminMetricCard,
   AdminNoteBlock,
   AdminRenderTarget,
+  AdminSubmitAction,
   AdminTableSection
 } from './types.js';
 
@@ -84,7 +87,116 @@ function renderMetrics(metrics: AdminMetricCard[] | undefined): string {
   `;
 }
 
-function renderActionLinks(gameKey: string, actions: AdminLinkAction[] | undefined): string {
+function renderBanner(banner: AdminBanner | undefined): string {
+  if (!banner) {
+    return '';
+  }
+
+  return `
+    <section class="admin-section">
+      <div class="admin-banner admin-banner-${escapeHtml(banner.tone)}">
+        ${escapeHtml(banner.message)}
+      </div>
+    </section>
+  `;
+}
+
+function renderField(sectionTitle: string, field: AdminFormSection['fields'][number]): string {
+  const inputId = `${sectionTitle}-${field.key}`;
+  const required = field.required ? ' required' : '';
+
+  if (field.type === 'hidden') {
+    return `<input type="hidden" name="${escapeHtml(field.key)}" value="${escapeHtml(field.value ?? '')}" />`;
+  }
+
+  const label = `
+    <label class="admin-form-label" for="${escapeHtml(inputId)}">
+      ${escapeHtml(field.label)}
+    </label>
+  `;
+
+  if (field.type === 'textarea') {
+    return `
+      <div class="admin-form-field admin-form-field-wide">
+        ${label}
+        <textarea
+          class="admin-form-textarea"
+          id="${escapeHtml(inputId)}"
+          name="${escapeHtml(field.key)}"
+          rows="${field.rows ?? 6}"
+          placeholder="${escapeHtml(field.placeholder ?? '')}"${required}
+        >${escapeHtml(field.value ?? '')}</textarea>
+      </div>
+    `;
+  }
+
+  if (field.type === 'select') {
+    return `
+      <div class="admin-form-field">
+        ${label}
+        <select class="admin-form-input" id="${escapeHtml(inputId)}" name="${escapeHtml(field.key)}"${required}>
+          ${(field.options ?? [])
+            .map((option) => {
+              const selected = option.value === (field.value ?? '') ? ' selected' : '';
+              return `<option value="${escapeHtml(option.value)}"${selected}>${escapeHtml(option.label)}</option>`;
+            })
+            .join('')}
+        </select>
+      </div>
+    `;
+  }
+
+  return `
+    <div class="admin-form-field">
+      ${label}
+      <input
+        class="admin-form-input"
+        id="${escapeHtml(inputId)}"
+        name="${escapeHtml(field.key)}"
+        type="text"
+        value="${escapeHtml(field.value ?? '')}"
+        placeholder="${escapeHtml(field.placeholder ?? '')}"${required}
+      />
+    </div>
+  `;
+}
+
+function renderForms(forms: AdminFormSection[] | undefined): string {
+  if (!forms || forms.length === 0) {
+    return '';
+  }
+
+  return `
+    <section class="admin-form-grid">
+      ${forms
+        .map(
+          (form) => `
+            <section class="admin-section admin-panel">
+              <div class="admin-panel-head">
+                <div>
+                  <h2>${escapeHtml(form.title)}</h2>
+                  <p>${escapeHtml(form.description)}</p>
+                </div>
+              </div>
+              <form class="admin-form" data-admin-form-action="${escapeHtml(form.action)}">
+                <div class="admin-form-layout">
+                  ${form.fields.map((field) => renderField(form.title, field)).join('')}
+                </div>
+                <div class="admin-form-submit-row">
+                  <button class="admin-button admin-button-primary" type="submit">
+                    ${escapeHtml(form.submitLabel)}
+                  </button>
+                </div>
+              </form>
+            </section>
+          `
+        )
+        .join('')}
+    </section>
+  `;
+}
+
+function renderActionLinks(gameKey: string, actions: Array<AdminLinkAction | AdminSubmitAction> | undefined): string {
   if (!actions || actions.length === 0) {
     return '';
   }
@@ -92,13 +204,28 @@ function renderActionLinks(gameKey: string, actions: AdminLinkAction[] | undefin
   return `
     <div class="admin-table-actions">
       ${actions
-        .map(
-          (action) => `
+        .map((action) => {
+          if (action.kind === 'submit') {
+            const toneClass = action.tone ? ` admin-button-${action.tone}` : '';
+            return `
+              <button
+                class="admin-button admin-button-inline${toneClass}"
+                type="button"
+                data-admin-submit-action="${escapeHtml(action.action)}"
+                data-admin-payload="${escapeHtml(JSON.stringify(action.payload ?? {}))}"
+                ${action.confirmText ? `data-admin-confirm="${escapeHtml(action.confirmText)}"` : ''}
+              >
+                ${escapeHtml(action.label)}
+              </button>
+            `;
+          }
+
+          return `
             <a class="admin-link-action" href="${escapeHtml(createAdminHash(gameKey, action.path, action.query))}">
               ${escapeHtml(action.label)}
             </a>
-          `
-        )
+          `;
+        })
         .join('')}
     </div>
   `;
@@ -370,6 +497,23 @@ export function getAdminShellStyles(): string {
       border: 1px solid var(--admin-line);
     }
 
+    .admin-banner {
+      padding: 14px 18px;
+      border-radius: 18px;
+      border: 1px solid var(--admin-line);
+      font-weight: 600;
+    }
+
+    .admin-banner-success {
+      background: rgba(88, 140, 93, 0.12);
+      color: #2b5d31;
+    }
+
+    .admin-banner-error {
+      background: rgba(178, 76, 42, 0.12);
+      color: #8f3217;
+    }
+
     .admin-metric-label {
       color: var(--admin-muted);
       font-size: 14px;
@@ -386,6 +530,12 @@ export function getAdminShellStyles(): string {
       padding: 20px;
     }
 
+    .admin-form-grid {
+      display: grid;
+      gap: 18px;
+      margin-top: 22px;
+    }
+
     .admin-panel-head h2 {
       margin: 0;
       font-size: 24px;
@@ -395,6 +545,54 @@ export function getAdminShellStyles(): string {
       margin: 8px 0 0;
       color: var(--admin-muted);
       line-height: 1.55;
+    }
+
+    .admin-form {
+      margin-top: 18px;
+    }
+
+    .admin-form-layout {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 14px;
+    }
+
+    .admin-form-field {
+      display: grid;
+      gap: 8px;
+    }
+
+    .admin-form-field-wide {
+      grid-column: 1 / -1;
+    }
+
+    .admin-form-label {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--admin-muted);
+    }
+
+    .admin-form-input,
+    .admin-form-textarea {
+      width: 100%;
+      border-radius: 16px;
+      border: 1px solid var(--admin-line);
+      background: rgba(255, 255, 255, 0.88);
+      color: var(--admin-ink);
+      font: inherit;
+      padding: 12px 14px;
+    }
+
+    .admin-form-textarea {
+      resize: vertical;
+      min-height: 120px;
+      line-height: 1.55;
+    }
+
+    .admin-form-submit-row {
+      margin-top: 16px;
+      display: flex;
+      justify-content: flex-start;
     }
 
     .admin-table-wrap {
@@ -435,16 +633,50 @@ export function getAdminShellStyles(): string {
       gap: 8px;
     }
 
+    .admin-button,
     .admin-link-action {
       display: inline-flex;
       align-items: center;
-      padding: 6px 10px;
+      justify-content: center;
       border-radius: 999px;
-      background: var(--admin-accent-soft);
-      color: var(--admin-accent);
-      text-decoration: none;
       font-size: 12px;
       font-weight: 700;
+      text-decoration: none;
+      cursor: pointer;
+    }
+
+    .admin-link-action {
+      padding: 6px 10px;
+      background: var(--admin-accent-soft);
+      color: var(--admin-accent);
+      border: 1px solid transparent;
+    }
+
+    .admin-button {
+      border: 1px solid transparent;
+      padding: 10px 16px;
+      background: rgba(255, 255, 255, 0.86);
+      color: var(--admin-ink);
+    }
+
+    .admin-button-inline {
+      padding: 6px 10px;
+      background: rgba(31, 42, 42, 0.06);
+    }
+
+    .admin-button-primary {
+      background: var(--admin-accent);
+      color: #fff8f3;
+    }
+
+    .admin-button-danger {
+      background: rgba(143, 50, 23, 0.12);
+      color: #8f3217;
+    }
+
+    .admin-button-default {
+      background: rgba(31, 42, 42, 0.06);
+      color: var(--admin-ink);
     }
 
     .admin-note-grid {
@@ -492,8 +724,10 @@ export function renderAdminSnapshot(snapshot: AdminAppSnapshot): string {
           <h1>${escapeHtml(snapshot.page.title)}</h1>
           <p>${escapeHtml(snapshot.page.description)}</p>
         </header>
+        ${renderBanner(snapshot.page.banner)}
         ${renderFilters(snapshot.page.filters)}
         ${renderMetrics(snapshot.page.metrics)}
+        ${renderForms(snapshot.page.forms)}
         ${renderTable(snapshot.gameKey, snapshot.page.table)}
         ${renderNotes(snapshot.page.notes)}
       </main>

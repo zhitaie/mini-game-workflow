@@ -26,10 +26,22 @@ export interface AdminMetricCard {
 }
 
 export interface AdminLinkAction {
+  kind?: 'link';
   label: string;
   path: AdminRoutePath;
   query?: Record<string, string | number | boolean>;
 }
+
+export interface AdminSubmitAction {
+  kind: 'submit';
+  label: string;
+  action: 'config.saveDraft' | 'config.publish' | 'notice.save' | 'notice.setStatus';
+  payload?: Record<string, string | number | boolean>;
+  confirmText?: string;
+  tone?: 'default' | 'primary' | 'danger';
+}
+
+export type AdminTableAction = AdminLinkAction | AdminSubmitAction;
 
 export interface AdminTableColumn {
   key: string;
@@ -39,7 +51,7 @@ export interface AdminTableColumn {
 export interface AdminTableRow {
   id: string;
   values: Record<string, string>;
-  actions?: AdminLinkAction[];
+  actions?: AdminTableAction[];
 }
 
 export interface AdminTableSection {
@@ -55,12 +67,43 @@ export interface AdminNoteBlock {
   lines: string[];
 }
 
+export interface AdminFormFieldOption {
+  label: string;
+  value: string;
+}
+
+export interface AdminFormField {
+  key: string;
+  label: string;
+  type: 'text' | 'textarea' | 'select' | 'hidden';
+  value?: string;
+  placeholder?: string;
+  required?: boolean;
+  rows?: number;
+  options?: AdminFormFieldOption[];
+}
+
+export interface AdminFormSection {
+  title: string;
+  description: string;
+  action: AdminSubmitAction['action'];
+  submitLabel: string;
+  fields: AdminFormField[];
+}
+
+export interface AdminBanner {
+  tone: 'success' | 'error';
+  message: string;
+}
+
 export interface AdminPageModel {
   path: AdminRoutePath;
   title: string;
   description: string;
   filters: AdminFilterChip[];
+  banner?: AdminBanner;
   metrics?: AdminMetricCard[];
+  forms?: AdminFormSection[];
   table?: AdminTableSection;
   notes?: AdminNoteBlock[];
 }

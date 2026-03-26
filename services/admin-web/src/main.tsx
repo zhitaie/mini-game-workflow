@@ -1,6 +1,6 @@
 import { resolveAdminRoute, adminRoutes } from './app/router.js';
 import { mountAdminSnapshot } from './app/render.js';
-import type { AdminAppSnapshot, AdminRenderResult, AdminRenderTarget, AdminRoutePath } from './app/types.js';
+import type { AdminAppSnapshot, AdminBanner, AdminRenderResult, AdminRenderTarget, AdminRoutePath } from './app/types.js';
 import { initAdminApiClient } from './services/api-client.js';
 
 export interface BootstrapAdminAppOptions {
@@ -10,6 +10,7 @@ export interface BootstrapAdminAppOptions {
   gameKey: string;
   route?: AdminRoutePath;
   query?: Record<string, string | number | boolean | undefined>;
+  banner?: AdminBanner;
   target?: AdminRenderTarget;
 }
 
@@ -26,6 +27,10 @@ export async function bootstrapAdminApp(options: BootstrapAdminAppOptions): Prom
     gameKey: options.gameKey,
     query: options.query
   });
+
+  if (options.banner) {
+    page.banner = options.banner;
+  }
 
   return {
     gameKey: options.gameKey,

@@ -72,6 +72,59 @@ export class GameConfigRepository {
     });
   }
 
+  saveDraft(record: Omit<GameConfigRecord, 'status' | 'updatedAt'> & { updatedAt?: number }): GameConfigRecord | null {
+    const now = record.updatedAt ?? Date.now();
+    const existing = this.findByVersion(record.gameKey, record.platform, record.configVersion);
+
+    if (existing?.status === 'active') {
+      return null;
+    }
+
+    this.database.sqlite
+      .prepare(
+        `
+          INSERT INTO game_config (
+            game_key,
+            platform,
+            config_version,
+            min_client_version,
+            max_client_version,
+            config_json,
+            status,
+            created_at,
+            published_at,
+            archived_at,
+            updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, 'draft', ?, NULL, NULL, ?)
+          ON CONFLICT(game_key, platform, config_version)
+          DO UPDATE SET
+            min_client_version = excluded.min_client_version,
+            max_client_version = excluded.max_client_version,
+            config_json = excluded.config_json,
+            status = 'draft',
+            published_at = NULL,
+            archived_at = NULL,
+            updated_at = excluded.updated_at
+        `
+      )
+      .run(
+        record.gameKey,
+        record.platform,
+        record.configVersion,
+        record.minClientVersion ?? null,
+        record.maxClientVersion ?? null,
+        JSON.stringify(record.payload),
+        now,
+        now
+      );
+
+    return {
+      ...record,
+      status: 'draft',
+      updatedAt: now
+    };
+  }
+
   ensureActive(record: Omit<GameConfigRecord, 'status' | 'updatedAt'> & { updatedAt?: number }): void {
     const active = this.findActive(record.gameKey, record.platform);
     if (active) {
@@ -100,33 +153,64 @@ export class GameConfigRepository {
           LIMIT 1
         `
       )
-      .get(gameKey, platform) as
-      | {
-          game_key: string;
-          platform: string;
-          config_version: string;
-          min_client_version: string | null;
-          max_client_version: string | null;
-          config_json: string;
-          status: 'draft' | 'active' | 'archived';
-          updated_at: number;
-        }
-      | undefined;
+      .get(gameKey, platform) as GameConfigRow | undefined;
 
-    if (!row) {
+    return row ? this.mapRow(row) : null;
+  }
+
+  findByVersion(gameKey: string, platform: string, configVersion: string): GameConfigRecord | null {
+    const row = this.database.sqlite
+      .prepare(
+        `
+          SELECT
+            game_key,
+            platform,
+            config_version,
+            min_client_version,
+            max_client_version,
+            config_json,
+            status,
+            updated_at
+          FROM game_config
+          WHERE game_key = ? AND platform = ? AND config_version = ?
+          LIMIT 1
+        `
+      )
+      .get(gameKey, platform, configVersion) as GameConfigRow | undefined;
+
+    return row ? this.mapRow(row) : null;
+  }
+
+  publishVersion(gameKey: string, platform: string, configVersion: string, updatedAt = Date.now()): GameConfigRecord | null {
+    const target = this.findByVersion(gameKey, platform, configVersion);
+
+    if (!target) {
       return null;
     }
 
-    return {
-      gameKey: row.game_key,
-      platform: row.platform,
-      configVersion: row.config_version,
-      minClientVersion: row.min_client_version ?? undefined,
-      maxClientVersion: row.max_client_version ?? undefined,
-      payload: JSON.parse(row.config_json) as Record<string, unknown>,
-      status: row.status,
-      updatedAt: row.updated_at
-    };
+    this.database.transaction(() => {
+      this.database.sqlite
+        .prepare(
+          `
+            UPDATE game_config
+            SET status = 'archived', archived_at = ?, updated_at = ?
+            WHERE game_key = ? AND platform = ? AND status = 'active'
+          `
+        )
+        .run(updatedAt, updatedAt, gameKey, platform);
+
+      this.database.sqlite
+        .prepare(
+          `
+            UPDATE game_config
+            SET status = 'active', published_at = ?, archived_at = NULL, updated_at = ?
+            WHERE game_key = ? AND platform = ? AND config_version = ?
+          `
+        )
+        .run(updatedAt, updatedAt, gameKey, platform, configVersion);
+    });
+
+    return this.findByVersion(gameKey, platform, configVersion);
   }
 
   list(filters: {
@@ -169,18 +253,13 @@ export class GameConfigRepository {
           ORDER BY updated_at DESC
         `
       )
-      .all(...values) as Array<{
-      game_key: string;
-      platform: string;
-      config_version: string;
-      min_client_version: string | null;
-      max_client_version: string | null;
-      config_json: string;
-      status: 'draft' | 'active' | 'archived';
-      updated_at: number;
-    }>;
+      .all(...values) as GameConfigRow[];
 
-    return rows.map((row) => ({
+    return rows.map((row) => this.mapRow(row));
+  }
+
+  private mapRow(row: GameConfigRow): GameConfigRecord {
+    return {
       gameKey: row.game_key,
       platform: row.platform,
       configVersion: row.config_version,
@@ -189,6 +268,17 @@ export class GameConfigRepository {
       payload: JSON.parse(row.config_json) as Record<string, unknown>,
       status: row.status,
       updatedAt: row.updated_at
-    }));
+    };
   }
+}
+
+interface GameConfigRow {
+  game_key: string;
+  platform: string;
+  config_version: string;
+  min_client_version: string | null;
+  max_client_version: string | null;
+  config_json: string;
+  status: 'draft' | 'active' | 'archived';
+  updated_at: number;
 }

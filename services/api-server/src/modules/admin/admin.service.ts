@@ -96,11 +96,65 @@ export class AdminService {
       configVersion: record.configVersion,
       minClientVersion: record.minClientVersion,
       maxClientVersion: record.maxClientVersion,
+      payload: record.payload,
       status: record.status,
       updatedAt: record.updatedAt
     }));
 
     return ok(this.wrapList(items));
+  }
+
+  saveConfigDraft(input: {
+    gameKey: string;
+    platform: string;
+    configVersion: string;
+    minClientVersion?: string;
+    maxClientVersion?: string;
+    payload: Record<string, unknown>;
+  }) {
+    const record = this.gameConfigRepository.saveDraft(input);
+
+    if (!record) {
+      return null;
+    }
+
+    return ok({
+      item: {
+        gameKey: record.gameKey,
+        platform: record.platform,
+        configVersion: record.configVersion,
+        minClientVersion: record.minClientVersion,
+        maxClientVersion: record.maxClientVersion,
+        payload: record.payload,
+        status: record.status,
+        updatedAt: record.updatedAt
+      }
+    });
+  }
+
+  publishConfig(input: {
+    gameKey: string;
+    platform: string;
+    configVersion: string;
+  }) {
+    const record = this.gameConfigRepository.publishVersion(input.gameKey, input.platform, input.configVersion);
+
+    if (!record) {
+      return null;
+    }
+
+    return ok({
+      item: {
+        gameKey: record.gameKey,
+        platform: record.platform,
+        configVersion: record.configVersion,
+        minClientVersion: record.minClientVersion,
+        maxClientVersion: record.maxClientVersion,
+        payload: record.payload,
+        status: record.status,
+        updatedAt: record.updatedAt
+      }
+    });
   }
 
   listNotices(filters: {
@@ -119,6 +173,70 @@ export class AdminService {
     }));
 
     return ok(this.wrapList(items));
+  }
+
+  saveNotice(input: {
+    id?: number;
+    gameKey: string;
+    title: string;
+    content: string;
+    status: 'draft' | 'active' | 'archived';
+    startTime: number | null;
+    endTime: number | null;
+  }) {
+    const record =
+      input.id === undefined
+        ? this.noticeRepository.create(input)
+        : this.noticeRepository.update({
+            id: input.id,
+            gameKey: input.gameKey,
+            title: input.title,
+            content: input.content,
+            status: input.status,
+            startTime: input.startTime,
+            endTime: input.endTime
+          });
+
+    if (!record) {
+      return null;
+    }
+
+    return ok({
+      item: {
+        id: record.id,
+        gameKey: record.gameKey,
+        title: record.title,
+        content: record.content,
+        status: record.status,
+        startTime: record.startTime,
+        endTime: record.endTime,
+        updatedAt: record.updatedAt
+      }
+    });
+  }
+
+  setNoticeStatus(input: {
+    id: number;
+    status: 'draft' | 'active' | 'archived';
+  }) {
+    const record = this.noticeRepository.setStatus(input.id, input.status);
+
+    if (!record) {
+      return null;
+    }
+
+    return ok({
+      item: {
+        id: record.id,
+        gameKey: record.gameKey,
+        title: record.title,
+        content: record.content,
+        status: record.status,
+        startTime: record.startTime,
+        endTime: record.endTime,
+        updatedAt: record.updatedAt
+      }
+    });
   }
 
   listAdLogs(filters: {
