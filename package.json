@@ -4,8 +4,8 @@
   "private": true,
   "packageManager": "pnpm@10.7.0",
   "scripts": {
-    "build": "pnpm -r run build",
-    "typecheck": "pnpm -r run typecheck",
+    "build": "node scripts/run-workspaces.mjs build",
+    "typecheck": "node scripts/run-workspaces.mjs typecheck",
     "serve:api": "node services/api-server/dist/services/api-server/src/cli.js",
     "dev:stack": "node scripts/start-dev-stack.mjs",
     "db:init": "node --experimental-specifier-resolution=node scripts/init-dev-db.mjs",

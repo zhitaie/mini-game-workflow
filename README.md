@@ -18,7 +18,7 @@
 - `services/api-server` 已从纯内存仓储切到基于 `node:sqlite` 的本地文件持久化，用于开发期真实落盘和联调验证
 - `services/api-server` 现在包含后台管理员账号、角色、会话与审计日志模型，后台不再依赖固定开发 token
 - `services/api-server` 现在已经有独立的 Node HTTP 入口，可以通过构建后执行 `node services/api-server/dist/services/api-server/src/cli.js` 启动
-- 根目录现在提供统一的本地 dev stack 入口：先构建，再执行 `npm run dev:stack`，然后打开 `http://127.0.0.1:3100`
+- 根目录现在提供统一的本地 dev stack 入口：先执行 `npm run build`，再执行 `npm run dev:stack`，然后打开 `http://127.0.0.1:3100`
 - 这个入口页会同时暴露：
   - 后台壳：`/admin.html`
   - 样例客户端：`/game-sample.html`
@@ -31,3 +31,17 @@
 - `admin / dev-admin-password`
 - `operator / dev-operator-password`
 - `viewer / dev-viewer-password`
+
+最小本地启动步骤：
+
+1. `npm install`
+2. `npm run build`
+3. `npm run dev:stack`
+4. 打开 `http://127.0.0.1:3100`
+
+可直接访问的页面：
+
+- 门户：`http://127.0.0.1:3100`
+- 后台：`http://127.0.0.1:3100/admin.html`
+- 样例客户端：`http://127.0.0.1:3100/game-sample.html`
+- 健康检查：`http://127.0.0.1:3000/health`
