@@ -3,5 +3,12 @@
   "version": "0.1.0",
   "private": true,
   "description": "Cocos Creator project root for ski-endless",
-  "type": "module"
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@mini-game-workflow/game-core-client": "file:../../../packages/game-core-client",
+    "@mini-game-workflow/game-core-types": "file:../../../packages/game-core-types"
+  }
 }

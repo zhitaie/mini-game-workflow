@@ -25,3 +25,22 @@
 3. 从 `Boot` 脚本里接入现有 `auth/config/save` runtime
 
 当前目录骨架存在的目的，是把第一款真实游戏与 `game-sample` 正式分开。
+
+当前仓库已经预放了第一批脚本骨架：
+
+- `assets/scripts/boot/`
+- `assets/scripts/config/`
+- `assets/scripts/data/`
+- `assets/scripts/game/`
+
+本地静态校验命令：
+
+```bash
+npm exec -- tsc --noEmit -p apps/ski-endless/client/tsconfig.json
+```
+
+这一步不是为了替代 Cocos 编辑器，而是为了在当前仓库里先校验：
+
+- 运行时接入代码是否自洽
+- `game.config.ts` 是否能被正确引用
+- 滑雪无尽的最小数据结构是否已经成型

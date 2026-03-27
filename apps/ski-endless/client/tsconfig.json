@@ -1,0 +1,12 @@
+{
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "experimentalDecorators": true
+  },
+  "include": [
+    "assets/scripts/**/*.ts",
+    "types/**/*.d.ts",
+    "../game.config.ts"
+  ]
+}
