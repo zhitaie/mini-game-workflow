@@ -639,7 +639,8 @@ export function createApp(options: CreateAppOptions = {}): ApiApp {
               gameKey: url.searchParams.get('gameKey') ?? undefined,
               adminUserId: url.searchParams.get('adminUserId') ? Number(url.searchParams.get('adminUserId')) : undefined,
               action: url.searchParams.get('action') ?? undefined,
-              targetType: url.searchParams.get('targetType') ?? undefined
+              targetType: url.searchParams.get('targetType') ?? undefined,
+              targetKey: url.searchParams.get('targetKey') ?? undefined
             })
           );
         }

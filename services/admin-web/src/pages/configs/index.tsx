@@ -159,6 +159,14 @@ export async function ConfigsPage(context: AdminPageLoaderContext): Promise<Admi
           config.status === 'draft'
             ? [
                 {
+                  label: '看审计',
+                  path: '/audit-logs',
+                  query: {
+                    targetType: 'game_config',
+                    targetKey: `${config.gameKey}:${config.platform}:${config.configVersion}`
+                  }
+                },
+                {
                   kind: 'submit',
                   label: '发布',
                   action: 'config.publish',
@@ -174,6 +182,14 @@ export async function ConfigsPage(context: AdminPageLoaderContext): Promise<Admi
             : config.status === 'active'
               ? [
                   {
+                    label: '看审计',
+                    path: '/audit-logs',
+                    query: {
+                      targetType: 'game_config',
+                      targetKey: `${config.gameKey}:${config.platform}:${config.configVersion}`
+                    }
+                  },
+                  {
                     kind: 'submit',
                     label: '归档',
                     action: 'config.archive',
@@ -186,7 +202,16 @@ export async function ConfigsPage(context: AdminPageLoaderContext): Promise<Admi
                     }
                   }
                 ]
-            : undefined
+            : [
+                {
+                  label: '看审计',
+                  path: '/audit-logs',
+                  query: {
+                    targetType: 'game_config',
+                    targetKey: `${config.gameKey}:${config.platform}:${config.configVersion}`
+                  }
+                }
+              ]
       })),
       emptyText: '当前筛选条件下没有配置记录。'
     },

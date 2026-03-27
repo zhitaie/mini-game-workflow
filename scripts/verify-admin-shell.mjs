@@ -54,6 +54,14 @@ const configs = await bootstrapAdminApp({
   route: '/configs'
 });
 
+const auditLogs = await bootstrapAdminApp({
+  baseURL: 'http://local.app',
+  adminToken: adminLogin.session.token,
+  fetchImpl: app.fetch,
+  gameKey: 'game_sample',
+  route: '/audit-logs'
+});
+
 if (!dashboard.page.metrics || dashboard.page.metrics.length !== 5) {
   throw new Error(`Unexpected dashboard shell: ${JSON.stringify(dashboard)}`);
 }
@@ -70,6 +78,10 @@ if (!rewardVerification.page.table || rewardVerification.page.table.rows.length 
   throw new Error(`Expected reward shell to be empty before rewards exist: ${JSON.stringify(rewardVerification)}`);
 }
 
+if (!auditLogs.page.table || auditLogs.page.table.rows.length !== 0) {
+  throw new Error(`Expected audit shell to be empty before admin writes exist: ${JSON.stringify(auditLogs)}`);
+}
+
 console.log(
   JSON.stringify(
     {
@@ -77,7 +89,8 @@ console.log(
       navigationSize: dashboard.navigation.length,
       dashboardPage: dashboard.page,
       usersPage: users.page,
-      configsPage: configs.page
+      configsPage: configs.page,
+      auditLogsPage: auditLogs.page
     },
     null,
     2

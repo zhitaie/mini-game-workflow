@@ -2,6 +2,7 @@ import { createApp } from '../services/api-server/dist/services/api-server/src/a
 import { bootstrapAndRenderAdminApp } from '../services/admin-web/dist/services/admin-web/src/main.js';
 import { initAdminApiClient } from '../services/admin-web/dist/services/admin-web/src/services/api-client.js';
 import { loginAdmin } from './lib/admin-auth.mjs';
+import { fetchAuditLogs } from '../services/admin-web/dist/services/admin-web/src/services/audit-logs.js';
 import {
   archiveConfig,
   fetchConfigs,
@@ -59,6 +60,10 @@ if (!configsRender.html.includes('data-admin-form-action="config.saveDraft"')) {
 
 if (!configsRender.html.includes('data-admin-submit-action="config.publish"')) {
   throw new Error(`Expected config publish action in render output: ${configsRender.html}`);
+}
+
+if (!configsRender.html.includes('#/audit-logs?gameKey=game_sample&amp;targetType=game_config&amp;targetKey=game_sample%3Aweb%3Averify-web-v2')) {
+  throw new Error(`Expected config render to include audit link: ${configsRender.html}`);
 }
 
 const published = await publishConfig({
@@ -204,6 +209,32 @@ if (!wrongGameStatusError || !wrongGameStatusError.includes('notice not found'))
   throw new Error(`Expected wrong-game notice status mutation to fail: ${String(wrongGameStatusError)}`);
 }
 
+const configAuditLogs = await fetchAuditLogs({
+  gameKey: 'game_sample',
+  targetType: 'game_config',
+  targetKey: 'game_sample:web:verify-web-v2'
+});
+const noticeAuditLogs = await fetchAuditLogs({
+  gameKey: 'game_sample',
+  targetType: 'notice',
+  targetKey: String(createdNotice.item.id)
+});
+
+if (
+  !configAuditLogs.items.some((item) => item.action === 'config.publish') ||
+  !configAuditLogs.items.some((item) => item.action === 'config.archive')
+) {
+  throw new Error(`Expected config audit chain to be present: ${JSON.stringify(configAuditLogs)}`);
+}
+
+if (
+  !noticeAuditLogs.items.some((item) => item.action === 'notice.create') ||
+  !noticeAuditLogs.items.some((item) => item.action === 'notice.update') ||
+  !noticeAuditLogs.items.some((item) => item.action === 'notice.set_status')
+) {
+  throw new Error(`Expected notice audit chain to be present: ${JSON.stringify(noticeAuditLogs)}`);
+}
+
 const noticesRender = await bootstrapAndRenderAdminApp({
   baseURL: 'http://local.app',
   adminToken: adminLogin.session.token,
@@ -223,6 +254,10 @@ if (!noticesRender.html.includes('data-admin-form-action="notice.save"') || !not
   throw new Error(`Expected notice mutation form in render output: ${noticesRender.html}`);
 }
 
+if (!noticesRender.html.includes(`#/audit-logs?gameKey=game_sample&amp;targetType=notice&amp;targetKey=${createdNotice.item.id}`)) {
+  throw new Error(`Expected notice render to include audit link: ${noticesRender.html}`);
+}
+
 console.log(
   JSON.stringify(
     {
@@ -234,9 +269,13 @@ console.log(
       archivedV2: archivedV2.item,
       updatedNotice: updatedNotice.item,
       activatedNotice: activatedNotice.item,
+      configAuditCount: configAuditLogs.total,
+      noticeAuditCount: noticeAuditLogs.total,
       wrongGameStatusError,
       renderedConfigContainsForm: true,
-      renderedNoticeContainsEditForm: true
+      renderedNoticeContainsEditForm: true,
+      renderedConfigContainsAuditLink: true,
+      renderedNoticeContainsAuditLink: true
     },
     null,
     2

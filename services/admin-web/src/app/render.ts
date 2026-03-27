@@ -18,7 +18,8 @@ const ROUTE_CONTEXT_KEYS: Record<string, string[]> = {
   '/notices': ['status'],
   '/ad-logs': ['gameUserId', 'sceneKey', 'verified', 'completed'],
   '/reward-logs': ['gameUserId', 'rewardType', 'reason', 'bizId'],
-  '/analytics': ['gameUserId', 'eventName']
+  '/analytics': ['gameUserId', 'eventName'],
+  '/audit-logs': ['adminUserId', 'action', 'targetType', 'targetKey']
 };
 
 function escapeHtml(value: string): string {

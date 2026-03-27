@@ -53,6 +53,32 @@ await runtime.network.request({
   }
 });
 
+const auditTargetKey = 'game_sample:web:audit-filter-v1';
+const auditSeedResponse = await app.fetch('http://local.app/api/admin/configs/draft', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'x-admin-token': adminLogin.session.token
+  },
+  body: JSON.stringify({
+    gameKey: 'game_sample',
+    platform: 'web',
+    configVersion: 'audit-filter-v1',
+    minClientVersion: '3.0.0',
+    maxClientVersion: '3.9.9',
+    payload: {
+      featureFlags: {
+        auditFilter: true
+      }
+    }
+  })
+});
+const auditSeedPayload = await auditSeedResponse.json();
+
+if (!auditSeedResponse.ok || !auditSeedPayload.success) {
+  throw new Error(`Expected audit seed config draft to succeed: ${JSON.stringify(auditSeedPayload)}`);
+}
+
 const usersPage = await bootstrapAdminApp({
   baseURL: 'http://local.app',
   adminToken: adminLogin.session.token,
@@ -126,6 +152,19 @@ const noticesPage = await bootstrapAdminApp({
   }
 });
 
+const auditLogsPage = await bootstrapAdminApp({
+  baseURL: 'http://local.app',
+  adminToken: adminLogin.session.token,
+  fetchImpl: app.fetch,
+  gameKey: 'game_sample',
+  route: '/audit-logs',
+  query: {
+    action: 'config.save_draft',
+    targetType: 'game_config',
+    targetKey: auditTargetKey
+  }
+});
+
 if (!usersPage.page.forms || usersPage.page.forms[0]?.kind !== 'query' || usersPage.page.table?.rows.length !== 1) {
   throw new Error(`Unexpected users filtered page: ${JSON.stringify(usersPage)}`);
 }
@@ -148,6 +187,10 @@ if (!configsPage.page.forms || configsPage.page.forms.length < 2 || configsPage.
 
 if (!noticesPage.page.forms || noticesPage.page.forms.length < 2 || noticesPage.page.forms[0]?.kind !== 'query') {
   throw new Error(`Unexpected notices page forms: ${JSON.stringify(noticesPage)}`);
+}
+
+if (!auditLogsPage.page.table || auditLogsPage.page.table.rows.length !== 1) {
+  throw new Error(`Unexpected audit log filtered page: ${JSON.stringify(auditLogsPage)}`);
 }
 
 const rendered = await bootstrapAndRenderAdminApp({
@@ -181,6 +224,26 @@ if (!rendered.html.includes('#/analytics?gameKey=game_sample&amp;gameUserId=1'))
   throw new Error(`Expected analytics nav context in rendered admin html: ${rendered.html}`);
 }
 
+const renderedAudit = await bootstrapAndRenderAdminApp({
+  baseURL: 'http://local.app',
+  adminToken: adminLogin.session.token,
+  fetchImpl: app.fetch,
+  gameKey: 'game_sample',
+  route: '/configs',
+  query: {
+    platform: 'web'
+  },
+  target: {
+    innerHTML: ''
+  }
+});
+
+if (
+  !renderedAudit.html.includes('#/audit-logs?gameKey=game_sample&amp;targetType=game_config&amp;targetKey=game_sample%3Aweb%3Aaudit-filter-v1')
+) {
+  throw new Error(`Expected config page to contain audit log link: ${renderedAudit.html}`);
+}
+
 console.log(
   JSON.stringify(
     {
@@ -189,11 +252,13 @@ console.log(
       filteredAdLogs: adLogsPage.page.table.rows.length,
       filteredRewardLogs: rewardLogsPage.page.table.rows.length,
       filteredAnalytics: analyticsPage.page.table.rows.length,
+      filteredAuditLogs: auditLogsPage.page.table.rows.length,
       configsFormKinds: configsPage.page.forms.map((form) => form.kind),
       noticesFormKinds: noticesPage.page.forms.map((form) => form.kind),
       renderedContainsQueryForm: true,
       renderedContainsResetLink: true,
-      renderedPreservesUserContextAcrossNav: true
+      renderedPreservesUserContextAcrossNav: true,
+      renderedConfigContainsAuditLink: true
     },
     null,
     2

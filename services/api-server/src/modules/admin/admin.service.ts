@@ -407,6 +407,7 @@ export class AdminService {
     adminUserId?: number;
     action?: string;
     targetType?: string;
+    targetKey?: string;
   }) {
     const items: AdminAuditLogItem[] = this.adminAuditLogRepository.list(filters).map((record) => ({
       id: record.id,

@@ -75,6 +75,7 @@ export class AdminAuditLogRepository {
     adminUserId?: number;
     action?: string;
     targetType?: string;
+    targetKey?: string;
   } = {}): AdminAuditLogRecord[] {
     const conditions = ['1 = 1'];
     const values: Array<string | number> = [];
@@ -97,6 +98,11 @@ export class AdminAuditLogRepository {
     if (filters.targetType) {
       conditions.push('target_type = ?');
       values.push(filters.targetType);
+    }
+
+    if (filters.targetKey) {
+      conditions.push('target_key = ?');
+      values.push(filters.targetKey);
     }
 
     const rows = this.database.sqlite

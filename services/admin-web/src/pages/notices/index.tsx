@@ -1,5 +1,5 @@
 import { formatTimestamp } from '../../app/format.js';
-import type { AdminPageLoaderContext, AdminPageModel } from '../../app/types.js';
+import type { AdminPageLoaderContext, AdminPageModel, AdminTableAction } from '../../app/types.js';
 import { fetchNotices } from '../../services/notices.js';
 
 function toDatetimeLocalValue(value: number | null): string {
@@ -144,57 +144,67 @@ export async function NoticesPage(context: AdminPageLoaderContext): Promise<Admi
         { key: 'endTime', label: '结束时间' },
         { key: 'updatedAt', label: '更新时间' }
       ],
-      rows: notices.items.map((notice) => ({
-        id: String(notice.id),
-        values: {
-          title: notice.title,
-          status: notice.status,
-          startTime: formatTimestamp(notice.startTime),
-          endTime: formatTimestamp(notice.endTime),
-          updatedAt: formatTimestamp(notice.updatedAt)
-        },
-        actions: [
+      rows: notices.items.map((notice) => {
+        const actions: AdminTableAction[] = [
+          {
+            label: '看审计',
+            path: '/audit-logs',
+            query: {
+              targetType: 'notice',
+              targetKey: String(notice.id)
+            }
+          },
           {
             label: '编辑',
             path: '/notices',
             query: {
               editNoticeId: notice.id
             }
+          }
+        ];
+
+        if (notice.status !== 'active') {
+          actions.push({
+            kind: 'submit',
+            label: '设为 active',
+            action: 'notice.setStatus',
+            tone: 'primary',
+            confirmText: '确认将这条公告切换为 active？',
+            payload: {
+              gameKey: context.gameKey,
+              id: notice.id,
+              status: 'active'
+            }
+          });
+        }
+
+        if (notice.status !== 'archived') {
+          actions.push({
+            kind: 'submit',
+            label: '归档',
+            action: 'notice.setStatus',
+            tone: 'danger',
+            confirmText: '确认归档这条公告？归档后客户端将不再读取。',
+            payload: {
+              gameKey: context.gameKey,
+              id: notice.id,
+              status: 'archived'
+            }
+          });
+        }
+
+        return {
+          id: String(notice.id),
+          values: {
+            title: notice.title,
+            status: notice.status,
+            startTime: formatTimestamp(notice.startTime),
+            endTime: formatTimestamp(notice.endTime),
+            updatedAt: formatTimestamp(notice.updatedAt)
           },
-          ...(notice.status !== 'active'
-            ? [
-                {
-                  kind: 'submit' as const,
-                  label: '设为 active',
-                  action: 'notice.setStatus' as const,
-                  tone: 'primary' as const,
-                  confirmText: '确认将这条公告切换为 active？',
-                  payload: {
-                    gameKey: context.gameKey,
-                    id: notice.id,
-                    status: 'active'
-                  }
-                }
-              ]
-            : []),
-          ...(notice.status !== 'archived'
-            ? [
-                {
-                  kind: 'submit' as const,
-                  label: '归档',
-                  action: 'notice.setStatus' as const,
-                  tone: 'danger' as const,
-                  confirmText: '确认归档这条公告？归档后客户端将不再读取。',
-                  payload: {
-                    gameKey: context.gameKey,
-                    id: notice.id,
-                    status: 'archived'
-                  }
-                }
-              ]
-            : [])
-        ]
-      })),
+          actions
+        };
+      }),
       emptyText: '当前筛选条件下没有公告记录。'
     },
     notes: [

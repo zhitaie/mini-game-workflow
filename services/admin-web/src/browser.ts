@@ -27,11 +27,17 @@ function parseHash(hash: string): {
   const cleaned = hash.startsWith('#') ? hash.slice(1) : hash;
   const [rawPath = '/dashboard', rawQuery = ''] = cleaned.split('?');
   const path = rawPath || '/dashboard';
-  const route = (
-    ['/dashboard', '/users', '/configs', '/notices', '/ad-logs', '/reward-logs', '/analytics'].includes(path)
-      ? path
-      : '/dashboard'
-  ) as AdminRoutePath;
+  const knownRoutes: AdminRoutePath[] = [
+    '/dashboard',
+    '/users',
+    '/configs',
+    '/notices',
+    '/ad-logs',
+    '/reward-logs',
+    '/analytics',
+    '/audit-logs'
+  ];
+  const route = (knownRoutes.includes(path as AdminRoutePath) ? path : '/dashboard') as AdminRoutePath;
   const params = new URLSearchParams(rawQuery);
   const query: Record<string, string> = {};
   params.forEach((value, key) => {

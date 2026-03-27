@@ -5,7 +5,8 @@ export type AdminRoutePath =
   | '/notices'
   | '/ad-logs'
   | '/reward-logs'
-  | '/analytics';
+  | '/analytics'
+  | '/audit-logs';
 
 export interface AdminNavItem {
   path: AdminRoutePath;

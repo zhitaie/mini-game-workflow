@@ -1,5 +1,6 @@
 import { AdLogsPage } from '../pages/ad-logs/index.js';
 import { AnalyticsPage } from '../pages/analytics/index.js';
+import { AuditLogsPage } from '../pages/audit-logs/index.js';
 import { ConfigsPage } from '../pages/configs/index.js';
 import { DashboardPage } from '../pages/dashboard/index.js';
 import { NoticesPage } from '../pages/notices/index.js';
@@ -49,6 +50,12 @@ export const adminRoutes: AdminRouteDefinition[] = [
     label: '埋点查询',
     description: '查看 analytics_event 轻量结果。',
     load: AnalyticsPage
+  },
+  {
+    path: '/audit-logs',
+    label: '审计日志',
+    description: '查看后台关键写操作审计记录。',
+    load: AuditLogsPage
   }
 ];
 

@@ -6,6 +6,7 @@ export interface FetchAuditLogsParams {
   adminUserId?: number;
   action?: string;
   targetType?: string;
+  targetKey?: string;
 }
 
 export async function fetchAuditLogs(params: FetchAuditLogsParams = {}): Promise<AdminListResult<AdminAuditLogItem>> {
