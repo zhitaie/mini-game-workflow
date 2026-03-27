@@ -37,6 +37,7 @@
 - `07-dev-process/00-IMPLEMENTATION_ROADMAP.md`：从文档到代码的实施顺序与阶段目标。
 - `02-workspace/04-REPO_FILE_RESPONSIBILITIES.md`：仓库首版目录树与关键文件职责。
 - `07-dev-process/01-FIRST_CODE_SKELETON.md`：第一版代码骨架与最小文件清单。
+- `07-dev-process/02-COCOS_SKI_ENDLESS_ADOPTION.md`：第一款真实 Cocos 游戏的接入方式、目录形态与改造边界。
 
 当前原则：
 

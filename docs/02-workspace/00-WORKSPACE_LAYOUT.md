@@ -46,6 +46,12 @@ mini-game-workflow/
 - 一整套独立后台
 - 可以抽到共享层的公共基础设施
 
+补充说明：
+
+- 如果某款游戏使用 `Cocos Creator`，`apps/<game>/client/` 可以直接是 Cocos 项目根目录。
+- 此时场景、Prefab、资源、脚本都属于该游戏自己的客户端实现，仍然不应反向污染 `packages/`。
+- `apps/<game>/game.config.ts` 继续保留在游戏根目录，用来描述接入声明，而不是放到 Cocos 资源目录里。
+
 ### 2.2 `packages/`
 
 这里放共享能力。
@@ -130,3 +136,17 @@ mini-game-workflow/
 - 游戏管理变化，大多只在 `services/admin-web/`
 
 如果边界守得住，新增第二个游戏时，不应该再回头改第一个游戏的玩法代码。
+
+## 6. Cocos 接入时的特殊约束
+
+如果某款游戏采用 `Cocos Creator`：
+
+- `apps/<game>/client/assets/`、`settings/`、`extensions/` 归该游戏自己管理
+- `packages/game-core-client/` 继续只放引擎无关的共享 runtime 能力
+- 如有必要，可后续新增很薄的 `packages/game-core-cocos/`，专门处理引擎桥接
+
+必须避免：
+
+- 在 `packages/` 中直接写具体场景脚本或 Prefab 逻辑
+- 让服务端接口因为 Cocos 接入而改变协议形状
+- 为了第一款游戏把 `game-sample` 直接替换掉

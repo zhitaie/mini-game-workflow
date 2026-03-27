@@ -1,0 +1,7 @@
+{
+  "name": "@mini-game-workflow/ski-endless-client",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Cocos Creator project root for ski-endless",
+  "type": "module"
+}
