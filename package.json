@@ -3,6 +3,11 @@
   "version": "0.1.0",
   "private": true,
   "packageManager": "pnpm@10.7.0",
+  "workspaces": [
+    "apps/*/client",
+    "packages/*",
+    "services/*"
+  ],
   "scripts": {
     "build": "node scripts/run-workspaces.mjs build",
     "typecheck": "node scripts/run-workspaces.mjs typecheck",

@@ -43,6 +43,7 @@ try {
   const adminMainAsset = await expectText(`${stack.shellURL}/dist/services/admin-web/src/main.js`);
   const sampleBrowserAsset = await expectText(`${stack.shellURL}/dist/apps/game-sample/client/src/browser.js`);
   const sampleBootstrapAsset = await expectText(`${stack.shellURL}/dist/apps/game-sample/client/src/bootstrap.js`);
+  const sampleGameConfigAsset = await expectText(`${stack.shellURL}/dist/apps/game-sample/game.config.js`);
   const sampleCoreClientAsset = await expectText(
     `${stack.shellURL}/dist/apps/game-sample/client/packages/game-core-client/src/index.js`
   );
@@ -84,7 +85,8 @@ try {
 
   if (
     !sampleBrowserAsset.text.includes('bootstrapGameSample') ||
-    !sampleBootstrapAsset.text.includes('@mini-game-workflow/game-core-client')
+    !sampleBootstrapAsset.text.includes('@mini-game-workflow/game-core-client') ||
+    !sampleGameConfigAsset.text.includes("gameKey: 'game_sample'")
   ) {
     throw new Error('Game sample static assets were not served as expected.');
   }

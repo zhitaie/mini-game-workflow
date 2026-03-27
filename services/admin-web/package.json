@@ -8,7 +8,6 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
-    "@mini-game-workflow/game-core-types": "workspace:*"
+    "@mini-game-workflow/game-core-types": "file:../../packages/game-core-types"
   }
 }
-

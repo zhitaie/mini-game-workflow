@@ -26,8 +26,8 @@ function buildCorsHeaders(): Record<string, string> {
   };
 }
 
-function normalizeHeaders(headers: Record<string, string | string[] | undefined>): string[][] {
-  const normalized: string[][] = [];
+function normalizeHeaders(headers: Record<string, string | string[] | undefined>): Array<[string, string]> {
+  const normalized: Array<[string, string]> = [];
 
   Object.entries(headers).forEach(([key, value]) => {
     if (typeof value === 'string') {

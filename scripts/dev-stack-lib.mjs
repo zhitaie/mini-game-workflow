@@ -18,6 +18,10 @@ const STATIC_MOUNTS = [
     directory: resolve(ROOT_DIR, 'apps/game-sample/client/dist/apps/game-sample/client')
   },
   {
+    urlPrefix: '/dist/apps/game-sample/',
+    directory: resolve(ROOT_DIR, 'apps/game-sample/client/dist/apps/game-sample')
+  },
+  {
     urlPrefix: '/dist/services/admin-web/packages/',
     directory: resolve(ROOT_DIR, 'services/admin-web/dist/packages')
   },
@@ -277,6 +281,7 @@ async function ensureBuildArtifacts() {
     resolve(ROOT_DIR, 'services/api-server/dist/services/api-server/src/server.js'),
     resolve(ROOT_DIR, 'services/admin-web/dist/services/admin-web/src/browser.js'),
     resolve(ROOT_DIR, 'apps/game-sample/client/dist/apps/game-sample/client/src/browser.js'),
+    resolve(ROOT_DIR, 'apps/game-sample/client/dist/apps/game-sample/game.config.js'),
     resolve(ROOT_DIR, 'apps/game-sample/client/dist/packages/game-core-client/src/index.js'),
     resolve(ROOT_DIR, 'apps/game-sample/client/dist/packages/game-core-types/src/index.js')
   ];

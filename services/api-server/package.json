@@ -9,6 +9,6 @@
     "start": "node dist/services/api-server/src/cli.js"
   },
   "dependencies": {
-    "@mini-game-workflow/game-core-types": "workspace:*"
+    "@mini-game-workflow/game-core-types": "file:../../packages/game-core-types"
   }
 }
