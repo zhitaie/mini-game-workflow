@@ -116,7 +116,7 @@ interface UIButton {
 }
 
 interface UIStatCard {
-  id: 'distance' | 'coins' | 'speed';
+  id: string;
   node: Node;
   background: Graphics;
   titleLabel: Label;
@@ -174,6 +174,8 @@ export class SkiEndlessGameScene extends Component {
   private noticeButtons: UIButton[] = [];
   private resultButtons: UIButton[] = [];
   private hudCards: UIStatCard[] = [];
+  private homeCards: UIStatCard[] = [];
+  private resultCards: UIStatCard[] = [];
 
   start(): void {
     const runtimeSession = SkiRuntimeSessionStore.get();
@@ -501,25 +503,25 @@ export class SkiEndlessGameScene extends Component {
 
     this.configureLabelNode(this.homeTitleLabel, new Vec3(0, 178, 0), HorizontalTextAlignment.CENTER, 520, 80, 56, 62);
     this.configureLabelNode(this.homeBadgeLabel, new Vec3(0, 120, 0), HorizontalTextAlignment.CENTER, 430, 46, 20, 24);
-    this.configureLabelNode(this.homeInfoLabel, new Vec3(0, 38, 0), HorizontalTextAlignment.CENTER, 560, 220, 28, 36);
-    this.configureLabelNode(this.homeToastLabel, new Vec3(0, -170, 0), HorizontalTextAlignment.CENTER, 560, 72, 22, 28);
+    this.configureLabelNode(this.homeInfoLabel, new Vec3(0, -72, 0), HorizontalTextAlignment.CENTER, 560, 110, 24, 32);
+    this.configureLabelNode(this.homeToastLabel, new Vec3(0, -206, 0), HorizontalTextAlignment.CENTER, 560, 60, 22, 28);
     this.configureLabelNode(this.rankTitleLabel, new Vec3(0, 186, 0), HorizontalTextAlignment.CENTER, 540, 70, 44, 50);
     this.configureLabelNode(this.rankInfoLabel, new Vec3(0, 4, 0), HorizontalTextAlignment.LEFT, 560, 330, 24, 30);
     this.configureLabelNode(this.noticeTitleLabel, new Vec3(0, 186, 0), HorizontalTextAlignment.CENTER, 540, 70, 44, 50);
     this.configureLabelNode(this.noticeInfoLabel, new Vec3(0, 4, 0), HorizontalTextAlignment.LEFT, 560, 330, 24, 30);
     this.configureLabelNode(this.resultTitleLabel, new Vec3(0, 140, 0), HorizontalTextAlignment.CENTER, 520, 70, 46, 52);
-    this.configureLabelNode(this.resultInfoLabel, new Vec3(0, 28, 0), HorizontalTextAlignment.CENTER, 560, 190, 26, 32);
+    this.configureLabelNode(this.resultInfoLabel, new Vec3(0, -16, 0), HorizontalTextAlignment.CENTER, 560, 150, 24, 30);
 
     this.homeButtons = [
-      this.createButton(this.homePanel, 'StartButton', 'Start Run', new Vec3(0, -58, 0), 'start_run', { width: 320, height: 66 }, {
+      this.createButton(this.homePanel, 'StartButton', 'Start Run', new Vec3(0, -122, 0), 'start_run', { width: 320, height: 66 }, {
         activeColor: new Color(20, 152, 108, 255),
         disabledColor: new Color(77, 92, 92, 255)
       }),
-      this.createButton(this.homePanel, 'RankButton', 'Leaderboard', new Vec3(-150, -134, 0), 'view_rank', { width: 220, height: 56 }, {
+      this.createButton(this.homePanel, 'RankButton', 'Leaderboard', new Vec3(-150, -184, 0), 'view_rank', { width: 220, height: 56 }, {
         activeColor: new Color(43, 87, 162, 255),
         disabledColor: new Color(77, 84, 97, 255)
       }),
-      this.createButton(this.homePanel, 'NoticeButton', 'Notice', new Vec3(150, -134, 0), 'view_notice', { width: 220, height: 56 }, {
+      this.createButton(this.homePanel, 'NoticeButton', 'Notice', new Vec3(150, -184, 0), 'view_notice', { width: 220, height: 56 }, {
         activeColor: new Color(54, 99, 173, 255),
         disabledColor: new Color(77, 84, 97, 255)
       })
@@ -559,9 +561,21 @@ export class SkiEndlessGameScene extends Component {
     ];
 
     this.hudCards = [
-      this.createStatCard(this.hudPanelRoot, 'DistanceCard', 'Distance', new Vec3(-245, 292, 0), new Color(52, 116, 215, 230)),
-      this.createStatCard(this.hudPanelRoot, 'CoinCard', 'Coins', new Vec3(0, 292, 0), new Color(221, 162, 37, 230)),
-      this.createStatCard(this.hudPanelRoot, 'SpeedCard', 'Speed', new Vec3(245, 292, 0), new Color(36, 152, 126, 230))
+      this.createStatCard(this.hudPanelRoot, 'DistanceCard', 'Distance', new Vec3(-245, 292, 0), new Color(52, 116, 215, 230), { width: 210, height: 84 }, 'distance'),
+      this.createStatCard(this.hudPanelRoot, 'CoinCard', 'Coins', new Vec3(0, 292, 0), new Color(221, 162, 37, 230), { width: 210, height: 84 }, 'coins'),
+      this.createStatCard(this.hudPanelRoot, 'SpeedCard', 'Speed', new Vec3(245, 292, 0), new Color(36, 152, 126, 230), { width: 210, height: 84 }, 'speed')
+    ];
+
+    this.homeCards = [
+      this.createStatCard(this.homePanel, 'HomeBestDistanceCard', 'Best Distance', new Vec3(-190, 26, 0), new Color(52, 116, 215, 230), { width: 180, height: 82 }),
+      this.createStatCard(this.homePanel, 'HomeCoinBankCard', 'Coin Bank', new Vec3(0, 26, 0), new Color(221, 162, 37, 230), { width: 180, height: 82 }),
+      this.createStatCard(this.homePanel, 'HomeBestScoreCard', 'Best Score', new Vec3(190, 26, 0), new Color(36, 152, 126, 230), { width: 180, height: 82 })
+    ];
+
+    this.resultCards = [
+      this.createStatCard(this.resultPanel, 'ResultDistanceCard', 'Distance', new Vec3(-190, 58, 0), new Color(52, 116, 215, 230), { width: 180, height: 82 }),
+      this.createStatCard(this.resultPanel, 'ResultCoinCard', 'Run Coins', new Vec3(0, 58, 0), new Color(221, 162, 37, 230), { width: 180, height: 82 }),
+      this.createStatCard(this.resultPanel, 'ResultBestCard', 'Best', new Vec3(190, 58, 0), new Color(36, 152, 126, 230), { width: 180, height: 82 })
     ];
   }
 
@@ -589,19 +603,19 @@ export class SkiEndlessGameScene extends Component {
 
     if (this.homeInfoLabel && this.controller) {
       const snapshot = this.controller.getSnapshot();
+      this.setStatCardValueByList(this.homeCards, 'HomeBestDistanceCard', `${String(snapshot.bestDistance)}m`);
+      this.setStatCardValueByList(this.homeCards, 'HomeCoinBankCard', `${String(snapshot.coins)}`);
+      this.setStatCardValueByList(this.homeCards, 'HomeBestScoreCard', `${String(snapshot.bestScore)}`);
       this.homeInfoLabel.string = [
         `Welcome back, Rider ${String(this.sessionUserId ?? 0)}`,
-        `Best Distance  ${String(snapshot.bestDistance)}m`,
-        `Best Score     ${String(snapshot.bestScore)}`,
-        `Coin Bank      ${String(snapshot.coins)}`,
         '',
-        'Slide through the snowfield, dodge obstacles,',
-        'collect coins, and push your farthest run.'
+        'Snowfield Endless is live.',
+        'Clean lane reads matter more than raw speed.'
       ].join('\n');
     }
 
     if (this.homeToastLabel) {
-      this.homeToastLabel.string = 'Tap Start to enter the slope';
+      this.homeToastLabel.string = 'Start a run, check the live board, or read current mountain updates.';
     }
 
     this.hudLabel && (this.hudLabel.string = '');
@@ -674,7 +688,7 @@ export class SkiEndlessGameScene extends Component {
     }
 
     if (this.rankInfoLabel) {
-      this.rankInfoLabel.string = 'Loading top riders...';
+      this.rankInfoLabel.string = 'Loading top riders...\n\nStand by while the board syncs.';
     }
 
     this.resultLabel && (this.resultLabel.string = '');
@@ -717,7 +731,7 @@ export class SkiEndlessGameScene extends Component {
     }
 
     if (this.noticeInfoLabel) {
-      this.noticeInfoLabel.string = 'Loading notice board...';
+      this.noticeInfoLabel.string = 'Loading notice board...\n\nStand by while the mountain desk checks updates.';
     }
 
     this.resultLabel && (this.resultLabel.string = '');
@@ -1046,9 +1060,9 @@ export class SkiEndlessGameScene extends Component {
 
     this.hudLabel.string = [
       `Rider ${String(this.sessionUserId ?? 0)}`,
-      `pace=${this.runState.stage}`,
-      `line=${this.runState.laneIndex === -1 ? 'left' : this.runState.laneIndex === 1 ? 'right' : 'center'}`,
-      `revive=${this.runState.reviveUsed ? 'used' : 'ready'}`
+      `pace ${this.runState.stage}`,
+      `line ${this.runState.laneIndex === -1 ? 'left' : this.runState.laneIndex === 1 ? 'right' : 'center'}`,
+      `revive ${this.runState.reviveUsed ? 'used' : 'ready'}`
     ].join('\n');
 
     this.setStatCardValue('distance', `${String(Math.floor(this.runState.distance))}m`);
@@ -1116,17 +1130,16 @@ export class SkiEndlessGameScene extends Component {
       return;
     }
 
+    this.setStatCardValueByList(this.resultCards, 'ResultDistanceCard', `${String(this.lastSummary.distance)}m`);
+    this.setStatCardValueByList(this.resultCards, 'ResultCoinCard', `${String(this.lastSummary.coinsCollected)}`);
+    this.setStatCardValueByList(this.resultCards, 'ResultBestCard', `${String(this.lastSummary.bestDistance)}m`);
+
     this.resultInfoLabel.string = [
       `Impact: ${crashedBy}`,
-      `Distance        ${String(this.lastSummary.distance)}m`,
-      `Score           ${String(this.lastSummary.score)}`,
-      `Run Coins       ${String(this.lastSummary.coinsCollected)}`,
-      `Coin Bank       ${String(this.savedCoinBank)}`,
-      `Best Distance   ${String(this.lastSummary.bestDistance)}m`,
-      `Best Score      ${String(this.lastSummary.bestScore)}`,
+      `Score ${String(this.lastSummary.score)}   Coin Bank ${String(this.savedCoinBank)}`,
       '',
-      `Revive Used     ${String(this.runState.reviveUsed)}`,
-      `Double Claimed  ${String(this.runState.doubleClaimed)}`
+      `Revive Used  ${String(this.runState.reviveUsed)}`,
+      `Double Coins ${String(this.runState.doubleClaimed)}`
     ].join('\n');
   }
 
@@ -1471,25 +1484,33 @@ export class SkiEndlessGameScene extends Component {
     };
   }
 
-  private createStatCard(parent: Node, name: string, title: string, position: Vec3, color: Color): UIStatCard {
+  private createStatCard(
+    parent: Node,
+    name: string,
+    title: string,
+    position: Vec3,
+    color: Color,
+    size: { width: number; height: number } = { width: 210, height: 84 },
+    cardId = name
+  ): UIStatCard {
     const node = this.ensureChildNode(parent, name, 1);
     node.setPosition(position);
     const transform = node.getComponent(UITransform) ?? node.addComponent(UITransform);
-    transform.setContentSize(210, 84);
+    transform.setContentSize(size.width, size.height);
     const background = this.ensureGraphics(node);
-    this.drawStatCard(background, color);
+    this.drawStatCard(background, color, size.width, size.height);
 
     const titleLabel = this.ensureLabelNode(node, `${name}Title`, 18);
     const valueLabel = this.ensureLabelNode(node, `${name}Value`, 28);
-    this.configureLabelNode(titleLabel, new Vec3(0, 18, 0), HorizontalTextAlignment.CENTER, 180, 28, 18, 22);
-    this.configureLabelNode(valueLabel, new Vec3(0, -14, 0), HorizontalTextAlignment.CENTER, 180, 36, 28, 32);
+    this.configureLabelNode(titleLabel, new Vec3(0, 18, 0), HorizontalTextAlignment.CENTER, size.width - 30, 28, 18, 22);
+    this.configureLabelNode(valueLabel, new Vec3(0, -14, 0), HorizontalTextAlignment.CENTER, size.width - 30, 36, 28, 32);
     titleLabel.color = new Color(226, 239, 250, 220);
     valueLabel.color = new Color(255, 255, 255, 255);
     titleLabel.string = title;
     valueLabel.string = '--';
 
     return {
-      id: name.startsWith('Distance') ? 'distance' : name.startsWith('Coin') ? 'coins' : 'speed',
+      id: cardId,
       node,
       background,
       titleLabel,
@@ -1499,6 +1520,15 @@ export class SkiEndlessGameScene extends Component {
 
   private setStatCardValue(id: UIStatCard['id'], value: string): void {
     const card = this.hudCards.find((item) => item.id === id);
+    if (!card) {
+      return;
+    }
+
+    card.valueLabel.string = value;
+  }
+
+  private setStatCardValueByList(cards: UIStatCard[], id: string, value: string): void {
+    const card = cards.find((item) => item.id === id);
     if (!card) {
       return;
     }
@@ -1517,19 +1547,21 @@ export class SkiEndlessGameScene extends Component {
     graphics.fill();
   }
 
-  private drawStatCard(graphics: Graphics, color: Color): void {
+  private drawStatCard(graphics: Graphics, color: Color, width = 210, height = 84): void {
+    const halfWidth = width / 2;
+    const halfHeight = height / 2;
     graphics.clear();
     graphics.fillColor = new Color(15, 24, 39, 175);
-    graphics.roundRect(-105, -42, 210, 84, 22);
+    graphics.roundRect(-halfWidth, -halfHeight, width, height, 22);
     graphics.fill();
 
     graphics.fillColor = color;
-    graphics.roundRect(-105, 16, 210, 26, 22);
+    graphics.roundRect(-halfWidth, halfHeight - 26, width, 26, 22);
     graphics.fill();
 
     graphics.strokeColor = new Color(255, 255, 255, 34);
     graphics.lineWidth = 2;
-    graphics.roundRect(-105, -42, 210, 84, 22);
+    graphics.roundRect(-halfWidth, -halfHeight, width, height, 22);
     graphics.stroke();
   }
 
