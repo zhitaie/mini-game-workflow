@@ -252,6 +252,8 @@ export class SkiEndlessGameScene extends Component {
   private animationClock = 0;
   private skierVisualX = 0;
   private skierVisualAngle = 0;
+  private hintVisibleUntil = 0;
+  private toastVisibleUntil = 0;
 
   start(): void {
     const runtimeSession = SkiRuntimeSessionStore.get();
@@ -291,6 +293,7 @@ export class SkiEndlessGameScene extends Component {
     this.animationClock += deltaTime;
     this.updateTrackVisuals(deltaTime);
     this.updateCoinBursts(deltaTime);
+    this.updateTransientToast();
 
     if (!this.runState || this.phase !== 'running' || this.runState.finished) {
       return;
@@ -300,7 +303,7 @@ export class SkiEndlessGameScene extends Component {
     const difficulty = this.getDifficultyProfile(run);
     if (run.stage !== difficulty.stage) {
       run.stage = difficulty.stage;
-      this.resultLabel && (this.resultLabel.string = `${difficulty.label}\n赛道节奏正在变化。`);
+      this.showStatusToast(`${difficulty.label}\n赛道节奏正在变化。`, 1.8);
     }
 
     run.speed = Math.min(difficulty.speedCap, run.speed + deltaTime * difficulty.acceleration);
@@ -624,7 +627,7 @@ export class SkiEndlessGameScene extends Component {
 
     this.hudPanelRoot.removeAllChildren();
     const homeBackground = this.ensureGraphics(this.homePanel);
-    this.drawPanelBackground(homeBackground, 0, 18, 620, 812, new Color(11, 23, 39, 232));
+    this.drawPanelBackground(homeBackground, 0, 14, 620, 780, new Color(11, 23, 39, 232));
     const rankBackground = this.ensureGraphics(this.rankPanel);
     this.drawPanelBackground(rankBackground, 0, 26, 620, 900, new Color(11, 23, 39, 236));
     const noticeBackground = this.ensureGraphics(this.noticePanel);
@@ -633,7 +636,7 @@ export class SkiEndlessGameScene extends Component {
     this.drawPanelBackground(settingsBackground, 0, 26, 620, 900, new Color(11, 23, 39, 236));
 
     const resultBackground = this.ensureGraphics(this.resultPanel);
-    this.drawPanelBackground(resultBackground, 0, -34, 620, 736, new Color(14, 22, 36, 234));
+    this.drawPanelBackground(resultBackground, 0, -20, 620, 708, new Color(14, 22, 36, 234));
 
     this.homeTitleLabel = this.ensureLabelNode(this.homePanel, 'HomeTitle', 52);
     this.homeBadgeLabel = this.ensureLabelNode(this.homePanel, 'HomeBadge', 20);
@@ -648,33 +651,33 @@ export class SkiEndlessGameScene extends Component {
     this.resultTitleLabel = this.ensureLabelNode(this.resultPanel, 'ResultTitle', 44);
     this.resultInfoLabel = this.ensureLabelNode(this.resultPanel, 'ResultInfo', 26);
 
-    this.configureLabelNode(this.homeTitleLabel, new Vec3(0, 282, 0), HorizontalTextAlignment.CENTER, 520, 70, 48, 54);
-    this.configureLabelNode(this.homeBadgeLabel, new Vec3(0, 234, 0), HorizontalTextAlignment.CENTER, 430, 36, 18, 22);
-    this.configureLabelNode(this.homeInfoLabel, new Vec3(0, -160, 0), HorizontalTextAlignment.CENTER, 540, 82, 22, 28);
-    this.configureLabelNode(this.homeToastLabel, new Vec3(0, -232, 0), HorizontalTextAlignment.CENTER, 520, 42, 18, 22);
+    this.configureLabelNode(this.homeTitleLabel, new Vec3(0, 288, 0), HorizontalTextAlignment.CENTER, 520, 70, 48, 54);
+    this.configureLabelNode(this.homeBadgeLabel, new Vec3(0, 240, 0), HorizontalTextAlignment.CENTER, 430, 36, 18, 22);
+    this.configureLabelNode(this.homeInfoLabel, new Vec3(0, -182, 0), HorizontalTextAlignment.CENTER, 540, 60, 22, 28);
+    this.configureLabelNode(this.homeToastLabel, new Vec3(0, -240, 0), HorizontalTextAlignment.CENTER, 520, 32, 17, 20);
     this.configureLabelNode(this.rankTitleLabel, new Vec3(0, 318, 0), HorizontalTextAlignment.CENTER, 540, 70, 44, 50);
     this.configureLabelNode(this.rankInfoLabel, new Vec3(0, 18, 0), HorizontalTextAlignment.LEFT, 540, 520, 24, 30);
     this.configureLabelNode(this.noticeTitleLabel, new Vec3(0, 318, 0), HorizontalTextAlignment.CENTER, 540, 70, 44, 50);
     this.configureLabelNode(this.noticeInfoLabel, new Vec3(0, 18, 0), HorizontalTextAlignment.LEFT, 540, 520, 24, 30);
     this.configureLabelNode(this.settingsTitleLabel, new Vec3(0, 318, 0), HorizontalTextAlignment.CENTER, 540, 70, 44, 50);
     this.configureLabelNode(this.settingsInfoLabel, new Vec3(0, 162, 0), HorizontalTextAlignment.LEFT, 540, 180, 24, 30);
-    this.configureLabelNode(this.resultTitleLabel, new Vec3(0, 228, 0), HorizontalTextAlignment.CENTER, 520, 64, 42, 48);
-    this.configureLabelNode(this.resultInfoLabel, new Vec3(0, 158, 0), HorizontalTextAlignment.CENTER, 540, 64, 21, 26);
+    this.configureLabelNode(this.resultTitleLabel, new Vec3(0, 232, 0), HorizontalTextAlignment.CENTER, 520, 64, 42, 48);
+    this.configureLabelNode(this.resultInfoLabel, new Vec3(0, 162, 0), HorizontalTextAlignment.CENTER, 540, 52, 20, 24);
 
     this.homeButtons = [
-      this.createButton(this.homePanel, 'StartButton', '开始滑行', new Vec3(0, -314, 0), 'start_run', { width: 320, height: 66 }, {
+      this.createButton(this.homePanel, 'StartButton', '开始滑行', new Vec3(0, -308, 0), 'start_run', { width: 320, height: 66 }, {
         activeColor: new Color(20, 152, 108, 255),
         disabledColor: new Color(77, 92, 92, 255)
       }),
-      this.createButton(this.homePanel, 'RankButton', '排行榜', new Vec3(0, -390, 0), 'view_rank', { width: 320, height: 56 }, {
+      this.createButton(this.homePanel, 'RankButton', '排行榜', new Vec3(0, -382, 0), 'view_rank', { width: 320, height: 56 }, {
         activeColor: new Color(43, 87, 162, 255),
         disabledColor: new Color(77, 84, 97, 255)
       }),
-      this.createButton(this.homePanel, 'NoticeButton', '公告', new Vec3(0, -458, 0), 'view_notice', { width: 320, height: 56 }, {
+      this.createButton(this.homePanel, 'NoticeButton', '公告', new Vec3(0, -448, 0), 'view_notice', { width: 320, height: 56 }, {
         activeColor: new Color(54, 99, 173, 255),
         disabledColor: new Color(77, 84, 97, 255)
       }),
-      this.createButton(this.homePanel, 'SettingsButton', '设置', new Vec3(0, -526, 0), 'view_settings', { width: 320, height: 56 }, {
+      this.createButton(this.homePanel, 'SettingsButton', '设置', new Vec3(0, -514, 0), 'view_settings', { width: 320, height: 56 }, {
         activeColor: new Color(83, 96, 122, 255),
         disabledColor: new Color(77, 84, 97, 255)
       })
@@ -718,19 +721,19 @@ export class SkiEndlessGameScene extends Component {
     ];
 
     this.resultButtons = [
-      this.createButton(this.resultPanel, 'ReviveButton', '复活一次', new Vec3(0, -204, 0), 'revive', { width: 320, height: 58 }, {
+      this.createButton(this.resultPanel, 'ReviveButton', '复活一次', new Vec3(0, -198, 0), 'revive', { width: 320, height: 58 }, {
         activeColor: new Color(245, 154, 33, 255),
         disabledColor: new Color(97, 89, 72, 255)
       }),
-      this.createButton(this.resultPanel, 'DoubleButton', '双倍金币', new Vec3(0, -276, 0), 'double_coin', { width: 320, height: 58 }, {
+      this.createButton(this.resultPanel, 'DoubleButton', '双倍金币', new Vec3(0, -268, 0), 'double_coin', { width: 320, height: 58 }, {
         activeColor: new Color(47, 113, 224, 255),
         disabledColor: new Color(77, 84, 97, 255)
       }),
-      this.createButton(this.resultPanel, 'RestartButton', '重新开始', new Vec3(0, -348, 0), 'restart', { width: 320, height: 58 }, {
+      this.createButton(this.resultPanel, 'RestartButton', '重新开始', new Vec3(0, -338, 0), 'restart', { width: 320, height: 58 }, {
         activeColor: new Color(31, 163, 134, 255),
         disabledColor: new Color(77, 84, 97, 255)
       }),
-      this.createButton(this.resultPanel, 'HomeButton', '返回首页', new Vec3(0, -420, 0), 'back_home', { width: 320, height: 58 }, {
+      this.createButton(this.resultPanel, 'HomeButton', '返回首页', new Vec3(0, -408, 0), 'back_home', { width: 320, height: 58 }, {
         activeColor: new Color(87, 95, 120, 255),
         disabledColor: new Color(77, 84, 97, 255)
       })
@@ -743,15 +746,15 @@ export class SkiEndlessGameScene extends Component {
     ];
 
     this.homeCards = [
-      this.createStatCard(this.homePanel, 'HomeBestDistanceCard', '最佳距离', new Vec3(0, 128, 0), new Color(52, 116, 215, 230), { width: 236, height: 84 }),
-      this.createStatCard(this.homePanel, 'HomeCoinBankCard', '金币库存', new Vec3(0, 28, 0), new Color(221, 162, 37, 230), { width: 236, height: 84 }),
-      this.createStatCard(this.homePanel, 'HomeBestScoreCard', '最高分', new Vec3(0, -72, 0), new Color(36, 152, 126, 230), { width: 236, height: 84 })
+      this.createStatCard(this.homePanel, 'HomeBestDistanceCard', '最佳距离', new Vec3(0, 142, 0), new Color(52, 116, 215, 230), { width: 236, height: 84 }),
+      this.createStatCard(this.homePanel, 'HomeCoinBankCard', '金币库存', new Vec3(0, 42, 0), new Color(221, 162, 37, 230), { width: 236, height: 84 }),
+      this.createStatCard(this.homePanel, 'HomeBestScoreCard', '最高分', new Vec3(0, -58, 0), new Color(36, 152, 126, 230), { width: 236, height: 84 })
     ];
 
     this.resultCards = [
-      this.createStatCard(this.resultPanel, 'ResultDistanceCard', '本局距离', new Vec3(0, 70, 0), new Color(52, 116, 215, 230), { width: 236, height: 84 }),
-      this.createStatCard(this.resultPanel, 'ResultCoinCard', '本局金币', new Vec3(0, -26, 0), new Color(221, 162, 37, 230), { width: 236, height: 84 }),
-      this.createStatCard(this.resultPanel, 'ResultBestCard', '历史最佳', new Vec3(0, -122, 0), new Color(36, 152, 126, 230), { width: 236, height: 84 })
+      this.createStatCard(this.resultPanel, 'ResultDistanceCard', '本局距离', new Vec3(0, 82, 0), new Color(52, 116, 215, 230), { width: 236, height: 84 }),
+      this.createStatCard(this.resultPanel, 'ResultCoinCard', '本局金币', new Vec3(0, -14, 0), new Color(221, 162, 37, 230), { width: 236, height: 84 }),
+      this.createStatCard(this.resultPanel, 'ResultBestCard', '历史最佳', new Vec3(0, -110, 0), new Color(36, 152, 126, 230), { width: 236, height: 84 })
     ];
   }
 
@@ -786,21 +789,23 @@ export class SkiEndlessGameScene extends Component {
       this.setStatCardValueByList(this.homeCards, 'HomeCoinBankCard', `${String(snapshot.coins)}`);
       this.setStatCardValueByList(this.homeCards, 'HomeBestScoreCard', `${String(snapshot.bestScore)}`);
       this.homeInfoLabel.string = [
-        `欢迎回来，滑手 ${String(this.sessionUserId ?? 0)}`,
+        '刷新最长距离，稳步积累金币。',
         this.preferences.coachTipsEnabled
-          ? '先看安全线，再顺路吃金币。'
-          : '提前选好空档，果断切线。'
+          ? '先走安全线，再吃顺路金币。'
+          : '保持节奏，稳定冲线。'
       ].join('\n');
     }
 
     if (this.homeToastLabel) {
       this.homeToastLabel.string = this.preferences.coachTipsEnabled
-        ? '距离决定得分。每局结束后都会结算金币。'
-        : '突破最佳距离，持续积累金币。';
+        ? '每局结束后都会自动结算金币。'
+        : '冲击最佳距离，持续提升成绩。';
     }
 
     this.hudLabel && (this.hudLabel.string = '');
     this.hudPanelRoot && (this.hudPanelRoot.active = false);
+    this.hintVisibleUntil = 0;
+    this.toastVisibleUntil = 0;
     this.hintLabel && (this.hintLabel.string = '');
     this.resultLabel && (this.resultLabel.string = '');
     this.audioDirector.setBgmMode('home');
@@ -841,7 +846,8 @@ export class SkiEndlessGameScene extends Component {
     this.hudPanelRoot && (this.hudPanelRoot.active = true);
     this.skierVisualX = 0;
     this.skierVisualAngle = 0;
-    this.resultLabel && (this.resultLabel.string = '热身段\n赛道宽，先熟悉节奏。');
+    this.hintVisibleUntil = this.animationClock + 7;
+    this.showStatusToast('热身段\n赛道宽，先熟悉节奏。', 2.6);
     this.renderHint();
     this.updateSkierVisual(0);
     this.renderHud();
@@ -874,6 +880,8 @@ export class SkiEndlessGameScene extends Component {
     }
 
     this.resultLabel && (this.resultLabel.string = '');
+    this.hintVisibleUntil = 0;
+    this.toastVisibleUntil = 0;
     this.renderHint();
     this.audioDirector.playButton();
 
@@ -919,6 +927,8 @@ export class SkiEndlessGameScene extends Component {
     }
 
     this.resultLabel && (this.resultLabel.string = '');
+    this.hintVisibleUntil = 0;
+    this.toastVisibleUntil = 0;
     this.renderHint();
     this.audioDirector.playButton();
 
@@ -957,6 +967,8 @@ export class SkiEndlessGameScene extends Component {
 
     this.renderSettingsInfo();
     this.resultLabel && (this.resultLabel.string = '');
+    this.hintVisibleUntil = 0;
+    this.toastVisibleUntil = 0;
     this.renderHint();
     this.audioDirector.playButton();
   }
@@ -1133,7 +1145,7 @@ export class SkiEndlessGameScene extends Component {
             this.runState.coinsCollected += 1;
             const burstPosition = entity.node.getPosition();
             entity.node.destroy();
-            this.resultLabel && (this.resultLabel.string = `吃到金币\n本局金币 ${String(this.runState.coinsCollected)}`);
+            this.showStatusToast(`+1 金币`, 0.7);
             this.audioDirector.playCoin();
             this.spawnCoinBurst(burstPosition.x, burstPosition.y);
             continue;
@@ -1196,7 +1208,7 @@ export class SkiEndlessGameScene extends Component {
     try {
       const verification = await this.controller.requestRevive();
       if (!verification.verified || !verification.completed) {
-        this.resultLabel && (this.resultLabel.string = '复活失败');
+        this.showStatusToast('复活失败', 1.4);
         return;
       }
 
@@ -1213,7 +1225,8 @@ export class SkiEndlessGameScene extends Component {
         (entity) => Math.abs(this.projectDepthToY(entity.depth) - PLAYER_Y) >= 140
       );
       this.resultPanel && (this.resultPanel.active = false);
-      this.resultLabel && (this.resultLabel.string = '复活成功\n继续滑行');
+      this.hintVisibleUntil = this.animationClock + 5;
+      this.showStatusToast('复活成功\n继续滑行', 1.8);
       this.hudPanelRoot && (this.hudPanelRoot.active = true);
       this.skierNode && (this.skierNode.active = true);
       this.audioDirector.playRevive();
@@ -1343,6 +1356,11 @@ export class SkiEndlessGameScene extends Component {
       return;
     }
 
+    if (this.animationClock > this.hintVisibleUntil) {
+      this.hintLabel.string = '';
+      return;
+    }
+
     this.hintLabel.string = [
       'A / D 键或点击左右区域切换车道',
       this.preferences.coachTipsEnabled
@@ -1362,8 +1380,8 @@ export class SkiEndlessGameScene extends Component {
 
     this.resultInfoLabel.string = [
       `撞击对象：${this.humanizeCrashReason(crashedBy)}`,
-      `得分 ${String(this.lastSummary.score)}  ·  金币库存 ${String(this.savedCoinBank)}`,
-      `${this.runState.reviveUsed ? '本局已复活' : '本局未复活'}  ·  ${this.runState.doubleClaimed ? '已领双倍' : '可领双倍'}`
+      `得分 ${String(this.lastSummary.score)}  ·  库存 ${String(this.savedCoinBank)}`,
+      `${this.runState.reviveUsed ? '已使用复活' : '未使用复活'}  ·  ${this.runState.doubleClaimed ? '已领取双倍' : '可领取双倍'}`
     ].join('\n');
   }
 
@@ -1386,6 +1404,30 @@ export class SkiEndlessGameScene extends Component {
     this.updateSettingsButtonLabels();
   }
 
+  private showStatusToast(message: string, duration = 1.6): void {
+    if (!this.resultLabel) {
+      return;
+    }
+
+    this.resultLabel.string = message;
+    this.toastVisibleUntil = this.animationClock + duration;
+  }
+
+  private updateTransientToast(): void {
+    if (!this.resultLabel) {
+      return;
+    }
+
+    if (this.phase === 'result') {
+      return;
+    }
+
+    if (this.toastVisibleUntil > 0 && this.animationClock >= this.toastVisibleUntil) {
+      this.resultLabel.string = '';
+      this.toastVisibleUntil = 0;
+    }
+  }
+
   private updateResultButtons(): void {
     if (!this.runState) {
       return;
@@ -1398,20 +1440,20 @@ export class SkiEndlessGameScene extends Component {
   }
 
   private applyDefaultLayout(): void {
-    this.configureLabelNode(this.hudLabel, new Vec3(0, 498, 0), HorizontalTextAlignment.CENTER, 420, 32, 18, 22);
-    this.configureLabelNode(this.hintLabel, new Vec3(0, -548, 0), HorizontalTextAlignment.CENTER, 560, 56, 18, 24);
-    this.configureLabelNode(this.resultLabel, new Vec3(0, -500, 0), HorizontalTextAlignment.CENTER, 500, 60, 18, 22);
+    this.configureLabelNode(this.hudLabel, new Vec3(0, 486, 0), HorizontalTextAlignment.CENTER, 360, 28, 16, 20);
+    this.configureLabelNode(this.hintLabel, new Vec3(0, -570, 0), HorizontalTextAlignment.CENTER, 520, 40, 16, 20);
+    this.configureLabelNode(this.resultLabel, new Vec3(0, -468, 0), HorizontalTextAlignment.CENTER, 420, 46, 17, 20);
 
     if (this.hudLabel) {
       this.hudLabel.color = new Color(230, 241, 251, 230);
     }
 
     if (this.hintLabel) {
-      this.hintLabel.color = new Color(231, 240, 248, 182);
+      this.hintLabel.color = new Color(236, 244, 251, 164);
     }
 
     if (this.resultLabel) {
-      this.resultLabel.color = new Color(255, 243, 211, 220);
+      this.resultLabel.color = new Color(255, 241, 198, 228);
     }
 
     if (this.skierNode) {
