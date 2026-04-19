@@ -12,10 +12,13 @@ import {
   Label,
   Node,
   ResolutionPolicy,
+  Sprite,
+  SpriteFrame,
   UITransform,
   Vec2,
   Vec3,
   input,
+  resources,
   view
 } from 'cc';
 import { SkiRuntimeSessionStore } from '../app/SkiRuntimeSessionStore';
@@ -99,6 +102,7 @@ interface TrackEntity {
   y: number;
   node: Node;
   colliderRadius: number;
+  pulseOffset: number;
 }
 
 interface StripeVisual {
@@ -138,6 +142,15 @@ interface SkiLocalPreferences {
   snowFxEnabled: boolean;
   assistLinesEnabled: boolean;
   coachTipsEnabled: boolean;
+}
+
+interface SkiVisualFrameMap {
+  background: SpriteFrame | null;
+  player: SpriteFrame | null;
+  coin: SpriteFrame | null;
+  tree: SpriteFrame | null;
+  rock: SpriteFrame | null;
+  gate: SpriteFrame | null;
 }
 
 @ccclass('SkiEndlessGameScene')
@@ -205,6 +218,16 @@ export class SkiEndlessGameScene extends Component {
     coachTipsEnabled: true
   };
   private readonly audioDirector = new SkiAudioDirector();
+  private readonly visualFrames: SkiVisualFrameMap = {
+    background: null,
+    player: null,
+    coin: null,
+    tree: null,
+    rock: null,
+    gate: null
+  };
+  private visualsRequested = false;
+  private animationClock = 0;
 
   start(): void {
     const runtimeSession = SkiRuntimeSessionStore.get();
@@ -226,6 +249,7 @@ export class SkiEndlessGameScene extends Component {
     this.buildPanels();
     this.renderHint();
     this.showHomeScreen();
+    void this.loadVisualAssets();
 
     input.on(Input.EventType.KEY_DOWN, this.onKeyDown, this);
     input.on(Input.EventType.TOUCH_START, this.onTouchStart, this);
@@ -238,6 +262,7 @@ export class SkiEndlessGameScene extends Component {
   }
 
   update(deltaTime: number): void {
+    this.animationClock += deltaTime;
     this.updateTrackVisuals(deltaTime);
 
     if (!this.runState || this.phase !== 'running' || this.runState.finished) {
@@ -437,49 +462,57 @@ export class SkiEndlessGameScene extends Component {
     this.snowParticles = [];
     this.laneGuideNodes = [];
 
-    const skyNode = this.createGraphicsNode('Sky', this.backgroundRoot, -5);
-    this.drawRect(skyNode, 0, 150, 840, 1480, new Color(122, 181, 235, 255));
+    if (this.visualFrames.background) {
+      this.createBackgroundSprite(this.backgroundRoot, this.visualFrames.background);
+      const tintNode = this.createGraphicsNode('BackdropTint', this.backgroundRoot, -4);
+      this.drawRect(tintNode, 0, 0, 760, 1320, new Color(19, 62, 114, 34));
+    } else {
+      const skyNode = this.createGraphicsNode('Sky', this.backgroundRoot, -5);
+      this.drawRect(skyNode, 0, 150, 840, 1480, new Color(122, 181, 235, 255));
 
-    const upperSkyNode = this.createGraphicsNode('UpperSky', this.backgroundRoot, -4);
-    this.drawRect(upperSkyNode, 0, 410, 840, 460, new Color(75, 137, 212, 255));
+      const upperSkyNode = this.createGraphicsNode('UpperSky', this.backgroundRoot, -4);
+      this.drawRect(upperSkyNode, 0, 410, 840, 460, new Color(75, 137, 212, 255));
 
-    const sunNode = this.createGraphicsNode('Sun', this.backgroundRoot, -3);
-    const sunGraphics = this.ensureGraphics(sunNode);
-    sunGraphics.clear();
-    sunGraphics.fillColor = new Color(255, 238, 178, 255);
-    sunGraphics.circle(238, 350, 56);
-    sunGraphics.fill();
+      const sunNode = this.createGraphicsNode('Sun', this.backgroundRoot, -3);
+      const sunGraphics = this.ensureGraphics(sunNode);
+      sunGraphics.clear();
+      sunGraphics.fillColor = new Color(255, 238, 178, 255);
+      sunGraphics.circle(238, 350, 56);
+      sunGraphics.fill();
 
-    const mountainFar = this.createGraphicsNode('MountainFar', this.backgroundRoot, -2);
-    this.drawMountainRange(mountainFar, 220, 260, new Color(180, 204, 228, 255), [
-      [-420, 10],
-      [-320, 170],
-      [-250, 70],
-      [-120, 230],
-      [0, 95],
-      [120, 215],
-      [260, 80],
-      [340, 188],
-      [420, 24]
-    ]);
+      const mountainFar = this.createGraphicsNode('MountainFar', this.backgroundRoot, -2);
+      this.drawMountainRange(mountainFar, 220, 260, new Color(180, 204, 228, 255), [
+        [-420, 10],
+        [-320, 170],
+        [-250, 70],
+        [-120, 230],
+        [0, 95],
+        [120, 215],
+        [260, 80],
+        [340, 188],
+        [420, 24]
+      ]);
 
-    const mountainNear = this.createGraphicsNode('MountainNear', this.backgroundRoot, -1);
-    this.drawMountainRange(mountainNear, 170, 210, new Color(214, 230, 245, 255), [
-      [-420, 0],
-      [-330, 112],
-      [-230, 42],
-      [-80, 138],
-      [40, 36],
-      [170, 122],
-      [280, 24],
-      [360, 118],
-      [420, 8]
-    ]);
+      const mountainNear = this.createGraphicsNode('MountainNear', this.backgroundRoot, -1);
+      this.drawMountainRange(mountainNear, 170, 210, new Color(214, 230, 245, 255), [
+        [-420, 0],
+        [-330, 112],
+        [-230, 42],
+        [-80, 138],
+        [40, 36],
+        [170, 122],
+        [280, 24],
+        [360, 118],
+        [420, 8]
+      ]);
+    }
 
     const trackNode = this.createGraphicsNode('Track', this.backgroundRoot, 0);
     const trackGraphics = this.ensureGraphics(trackNode);
     trackGraphics.clear();
-    trackGraphics.fillColor = new Color(238, 245, 250, 255);
+    trackGraphics.fillColor = this.visualFrames.background
+      ? new Color(244, 249, 255, 126)
+      : new Color(238, 245, 250, 255);
     trackGraphics.moveTo(-TRACK_HALF_WIDTH_TOP, 260);
     trackGraphics.lineTo(TRACK_HALF_WIDTH_TOP, 260);
     trackGraphics.lineTo(TRACK_HALF_WIDTH_BOTTOM, -640);
@@ -490,7 +523,9 @@ export class SkiEndlessGameScene extends Component {
     const edgeGraphics = this.createGraphicsNode('TrackEdge', this.backgroundRoot, 1);
     const edge = this.ensureGraphics(edgeGraphics);
     edge.clear();
-    edge.strokeColor = new Color(208, 222, 232, 255);
+    edge.strokeColor = this.visualFrames.background
+      ? new Color(234, 247, 255, 184)
+      : new Color(208, 222, 232, 255);
     edge.lineWidth = 6;
     edge.moveTo(-TRACK_HALF_WIDTH_TOP, 260);
     edge.lineTo(-TRACK_HALF_WIDTH_BOTTOM, -640);
@@ -502,7 +537,7 @@ export class SkiEndlessGameScene extends Component {
       const stripeNode = this.createGraphicsNode(`Stripe-${index}`, this.backgroundRoot, 2);
       const graphic = this.ensureGraphics(stripeNode);
       graphic.clear();
-      graphic.fillColor = new Color(255, 255, 255, 92);
+      graphic.fillColor = new Color(255, 255, 255, this.visualFrames.background ? 74 : 92);
       graphic.roundRect(-42, -18, 84, 36, 18);
       graphic.fill();
       this.stripes.push({
@@ -521,11 +556,10 @@ export class SkiEndlessGameScene extends Component {
     this.buildAmbientSnow();
 
     this.skierNode = this.ensureChildNode(this.itemRoot, 'Skier', 4);
-    const skierGraphic = this.ensureGraphics(this.skierNode);
-    this.drawSkier(skierGraphic);
+    this.renderSkierNode();
     const skierTransform = this.skierNode.getComponent(UITransform);
     if (skierTransform) {
-      skierTransform.setContentSize(120, 120);
+      skierTransform.setContentSize(128, 168);
     }
 
     this.applyPreferenceVisuals();
@@ -996,18 +1030,25 @@ export class SkiEndlessGameScene extends Component {
       return;
     }
 
-    const node = this.createGraphicsNode(`${kind}-${Date.now()}`, this.itemRoot, 1);
-    const graphic = this.ensureGraphics(node);
+    const node = this.createVisualNode(`${kind}-${Date.now()}`, this.itemRoot, 1);
 
     if (kind === 'coin') {
-      this.drawCoin(graphic);
+      this.renderCoinNode(node);
     } else {
-      this.drawObstacle(graphic, obstacleType);
+      this.renderObstacleNode(node, obstacleType, 'track');
     }
 
     const transform = node.getComponent(UITransform);
     if (transform) {
-      transform.setContentSize(kind === 'coin' ? 48 : 110, kind === 'coin' ? 48 : 120);
+      if (kind === 'coin') {
+        transform.setContentSize(58, 58);
+      } else if (obstacleType === 'rock') {
+        transform.setContentSize(136, 104);
+      } else if (obstacleType === 'gate') {
+        transform.setContentSize(160, 144);
+      } else {
+        transform.setContentSize(150, 176);
+      }
     }
 
     this.entities.push({
@@ -1016,7 +1057,8 @@ export class SkiEndlessGameScene extends Component {
       laneIndex,
       y,
       node,
-      colliderRadius: kind === 'coin' ? 38 : obstacleType === 'gate' ? 60 : 72
+      colliderRadius: kind === 'coin' ? 38 : obstacleType === 'gate' ? 60 : 72,
+      pulseOffset: Math.random() * Math.PI * 2
     });
     this.positionEntity(this.entities[this.entities.length - 1]);
   }
@@ -1364,7 +1406,10 @@ export class SkiEndlessGameScene extends Component {
     }
 
     this.skierNode.active = this.phase !== 'home';
-    this.skierNode.setPosition(this.getLaneX(laneIndex, 0.98), PLAYER_Y, 0);
+    const bob = this.phase === 'running' ? Math.sin(this.animationClock * 8.2) * 4 : 0;
+    const squash = this.phase === 'running' ? 1 + Math.sin(this.animationClock * 8.2) * 0.02 : 1;
+    this.skierNode.setPosition(this.getLaneX(laneIndex, 0.98), PLAYER_Y + bob, 0);
+    this.skierNode.setScale(squash, squash, 1);
     this.skierNode.angle = -laneIndex * 6;
   }
 
@@ -1534,9 +1579,18 @@ export class SkiEndlessGameScene extends Component {
     const laneSpread = this.interpolate(0.72, 1.08, progress);
     const x = this.getLaneX(entity.laneIndex, laneSpread);
     const scale = this.interpolate(0.62, 1.35, progress);
+    const pulse = Math.sin(this.animationClock * 7.2 + entity.pulseOffset);
+    const bob = entity.kind === 'coin' ? pulse * (4 + progress * 6) : 0;
+    const visualScale = entity.kind === 'coin' ? scale * (1 + pulse * 0.08) : scale;
 
-    entity.node.setPosition(x, entity.y, 0);
-    entity.node.setScale(scale, scale, 1);
+    entity.node.setPosition(x, entity.y + bob, 0);
+    entity.node.setScale(visualScale, visualScale, 1);
+    entity.node.angle =
+      entity.kind === 'obstacle' && entity.obstacleType === 'tree'
+        ? pulse * 1.8
+        : entity.kind === 'obstacle' && entity.obstacleType === 'gate'
+          ? pulse * 0.8
+          : 0;
   }
 
   private getLaneX(laneIndex: LaneIndex, spread: number): number {
@@ -1670,6 +1724,16 @@ export class SkiEndlessGameScene extends Component {
     return node;
   }
 
+  private createVisualNode(name: string, parent: Node, siblingIndex: number): Node {
+    const node = new Node(name);
+    parent.addChild(node);
+    if (siblingIndex >= 0) {
+      node.setSiblingIndex(siblingIndex);
+    }
+    node.addComponent(UITransform);
+    return node;
+  }
+
   private ensureGraphics(node: Node): Graphics {
     let transform = node.getComponent(UITransform);
     if (!transform) {
@@ -1682,6 +1746,21 @@ export class SkiEndlessGameScene extends Component {
     }
 
     return graphics;
+  }
+
+  private ensureSprite(node: Node): Sprite {
+    let transform = node.getComponent(UITransform);
+    if (!transform) {
+      transform = node.addComponent(UITransform);
+    }
+
+    let sprite = node.getComponent(Sprite);
+    if (!sprite) {
+      sprite = node.addComponent(Sprite);
+    }
+
+    sprite.sizeMode = Sprite.SizeMode.CUSTOM;
+    return sprite;
   }
 
   private createButton(
@@ -1857,13 +1936,13 @@ export class SkiEndlessGameScene extends Component {
     }
 
     for (let index = 0; index < 6; index += 1) {
-      const leftTree = this.createGraphicsNode(`DecorTreeLeft-${index}`, this.backgroundRoot, 4);
-      const rightTree = this.createGraphicsNode(`DecorTreeRight-${index}`, this.backgroundRoot, 4);
+      const leftTree = this.createVisualNode(`DecorTreeLeft-${index}`, this.backgroundRoot, 4);
+      const rightTree = this.createVisualNode(`DecorTreeRight-${index}`, this.backgroundRoot, 4);
       const y = 270 - index * 166;
       const scale = 0.8 + index * 0.08;
 
-      this.drawObstacle(this.ensureGraphics(leftTree), 'tree');
-      this.drawObstacle(this.ensureGraphics(rightTree), 'tree');
+      this.renderObstacleNode(leftTree, 'tree', 'decor');
+      this.renderObstacleNode(rightTree, 'tree', 'decor');
       leftTree.setPosition(-355 + index * 10, y, 0);
       rightTree.setPosition(355 - index * 10, y + 40, 0);
       leftTree.setScale(scale, scale, 1);
@@ -1957,6 +2036,159 @@ export class SkiEndlessGameScene extends Component {
     graphics.fill();
     graphics.circle(centerX + (centerX < 0 ? 55 : -55), -220, 84);
     graphics.fill();
+  }
+
+  private async loadVisualAssets(): Promise<void> {
+    if (this.visualsRequested) {
+      return;
+    }
+
+    this.visualsRequested = true;
+
+    const [
+      background,
+      player,
+      coin,
+      tree,
+      rock,
+      gate
+    ] = await Promise.all([
+      this.loadSpriteFrame('ski/backgrounds/background-snowfield'),
+      this.loadSpriteFrame('ski/sprites/player-skier-back'),
+      this.loadSpriteFrame('ski/sprites/coin-gold'),
+      this.loadSpriteFrame('ski/sprites/tree-snow-pine'),
+      this.loadSpriteFrame('ski/sprites/rock-snow'),
+      this.loadSpriteFrame('ski/sprites/gate-red')
+    ]);
+
+    this.visualFrames.background = background;
+    this.visualFrames.player = player;
+    this.visualFrames.coin = coin;
+    this.visualFrames.tree = tree;
+    this.visualFrames.rock = rock;
+    this.visualFrames.gate = gate;
+
+    this.buildTrackVisuals();
+    this.applyDefaultLayout();
+    this.updateSkierVisual(this.runState?.laneIndex ?? 0);
+    this.renderHud();
+    this.renderHint();
+  }
+
+  private loadSpriteFrame(path: string): Promise<SpriteFrame | null> {
+    return new Promise((resolve) => {
+      resources.load(`${path}/spriteFrame`, SpriteFrame, (error, frame) => {
+        if (error) {
+          resolve(null);
+          return;
+        }
+        resolve(frame);
+      });
+    });
+  }
+
+  private createBackgroundSprite(parent: Node, frame: SpriteFrame): void {
+    const node = this.createVisualNode('BackdropSprite', parent, -5);
+    const sprite = this.ensureSprite(node);
+    const transform = node.getComponent(UITransform);
+    const baseWidth = frame.originalSize.width || frame.rect.width;
+    const baseHeight = frame.originalSize.height || frame.rect.height;
+    const coverScale = Math.max(760 / baseWidth, 1320 / baseHeight);
+
+    sprite.spriteFrame = frame;
+    if (transform) {
+      transform.setContentSize(baseWidth, baseHeight);
+    }
+    node.setScale(coverScale, coverScale, 1);
+    node.setPosition(0, 0, 0);
+  }
+
+  private renderSkierNode(): void {
+    if (!this.skierNode) {
+      return;
+    }
+
+    if (this.visualFrames.player) {
+      this.applySpriteVisual(this.skierNode, this.visualFrames.player, 132, 182);
+      return;
+    }
+
+    const skierGraphic = this.beginFallbackGraphics(this.skierNode, 120, 120);
+    this.drawSkier(skierGraphic);
+  }
+
+  private renderCoinNode(node: Node): void {
+    if (this.visualFrames.coin) {
+      this.applySpriteVisual(node, this.visualFrames.coin, 56, 56);
+      return;
+    }
+
+    const graphic = this.beginFallbackGraphics(node, 48, 48);
+    this.drawCoin(graphic);
+  }
+
+  private renderObstacleNode(node: Node, obstacleType: ObstacleType, usage: 'track' | 'decor'): void {
+    const frame =
+      obstacleType === 'tree'
+        ? this.visualFrames.tree
+        : obstacleType === 'rock'
+          ? this.visualFrames.rock
+          : this.visualFrames.gate;
+
+    const size =
+      obstacleType === 'rock'
+        ? usage === 'decor'
+          ? { width: 132, height: 104 }
+          : { width: 136, height: 104 }
+        : obstacleType === 'gate'
+          ? usage === 'decor'
+            ? { width: 142, height: 150 }
+            : { width: 160, height: 144 }
+          : usage === 'decor'
+            ? { width: 164, height: 194 }
+            : { width: 150, height: 176 };
+
+    if (frame) {
+      this.applySpriteVisual(node, frame, size.width, size.height);
+      return;
+    }
+
+    const graphic = this.beginFallbackGraphics(node, size.width, size.height);
+    this.drawObstacle(graphic, obstacleType);
+  }
+
+  private beginFallbackGraphics(node: Node, width: number, height: number): Graphics {
+    const sprite = node.getComponent(Sprite);
+    if (sprite) {
+      sprite.enabled = false;
+    }
+
+    const transform = node.getComponent(UITransform);
+    if (transform) {
+      transform.setContentSize(width, height);
+    }
+
+    const graphics = this.ensureGraphics(node);
+    graphics.enabled = true;
+    graphics.clear();
+    return graphics;
+  }
+
+  private applySpriteVisual(node: Node, frame: SpriteFrame, width: number, height: number): void {
+    const graphics = node.getComponent(Graphics);
+    if (graphics) {
+      graphics.enabled = false;
+      graphics.clear();
+    }
+
+    const sprite = this.ensureSprite(node);
+    sprite.enabled = true;
+    sprite.spriteFrame = frame;
+
+    const transform = node.getComponent(UITransform);
+    if (transform) {
+      transform.setContentSize(width, height);
+    }
   }
 
   private drawSkier(graphics: Graphics): void {
