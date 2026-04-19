@@ -26,8 +26,23 @@ export class SkiAudioDirector {
     }
 
     this.masterGain.gain.cancelScheduledValues(context.currentTime);
-    this.masterGain.gain.setValueAtTime(0.14, context.currentTime);
+    this.masterGain.gain.setValueAtTime(0.2, context.currentTime);
     this.setBgmMode(this.bgmMode);
+  }
+
+  unlock(): void {
+    const context = this.ensureContext();
+    if (!context || !this.enabled) {
+      return;
+    }
+
+    if (context.state === 'suspended') {
+      void context.resume();
+    }
+
+    if (this.bgmMode !== 'none' && this.bgmOscillators.length === 0) {
+      this.setBgmMode(this.bgmMode);
+    }
   }
 
   setBgmMode(mode: SkiBgmMode): void {
@@ -55,17 +70,17 @@ export class SkiAudioDirector {
     const configs =
       mode === 'home'
         ? [
-            { frequency: 196, type: 'sine' as OscillatorType, gain: 0.032 },
-            { frequency: 293.66, type: 'triangle' as OscillatorType, gain: 0.016 }
+            { frequency: 196, type: 'sine' as OscillatorType, gain: 0.05 },
+            { frequency: 293.66, type: 'triangle' as OscillatorType, gain: 0.024 }
           ]
         : mode === 'run'
           ? [
-              { frequency: 110, type: 'sawtooth' as OscillatorType, gain: 0.026 },
-              { frequency: 220, type: 'triangle' as OscillatorType, gain: 0.012 }
+              { frequency: 110, type: 'sawtooth' as OscillatorType, gain: 0.042 },
+              { frequency: 220, type: 'triangle' as OscillatorType, gain: 0.02 }
             ]
           : [
-              { frequency: 164.81, type: 'triangle' as OscillatorType, gain: 0.022 },
-              { frequency: 246.94, type: 'sine' as OscillatorType, gain: 0.012 }
+              { frequency: 164.81, type: 'triangle' as OscillatorType, gain: 0.036 },
+              { frequency: 246.94, type: 'sine' as OscillatorType, gain: 0.018 }
             ];
 
     for (const config of configs) {
@@ -161,7 +176,7 @@ export class SkiAudioDirector {
 
       this.audioContext = new AudioContextCtor();
       this.masterGain = this.audioContext.createGain();
-      this.masterGain.gain.setValueAtTime(0.14, this.audioContext.currentTime);
+      this.masterGain.gain.setValueAtTime(0.2, this.audioContext.currentTime);
       this.masterGain.connect(this.audioContext.destination);
     }
 

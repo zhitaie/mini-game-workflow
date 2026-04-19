@@ -1,5 +1,6 @@
 import {
   _decorator,
+  Canvas,
   Color,
   Component,
   EventKeyboard,
@@ -10,6 +11,7 @@ import {
   KeyCode,
   Label,
   Node,
+  ResolutionPolicy,
   UITransform,
   Vec2,
   Vec3,
@@ -218,6 +220,7 @@ export class SkiEndlessGameScene extends Component {
     this.loadPreferences();
     this.audioDirector.setAudioEnabled(this.preferences.audioEnabled);
     this.ensureSceneNodes();
+    this.applyPortraitPresentation();
     this.applyDefaultLayout();
     this.buildTrackVisuals();
     this.buildPanels();
@@ -263,6 +266,8 @@ export class SkiEndlessGameScene extends Component {
   }
 
   private onKeyDown(event: EventKeyboard): void {
+    this.audioDirector.unlock();
+
     if (!this.controller || this.busy) {
       return;
     }
@@ -327,6 +332,8 @@ export class SkiEndlessGameScene extends Component {
   }
 
   private onTouchStart(event: EventTouch): void {
+    this.audioDirector.unlock();
+
     const location = event.getUILocation();
 
     if (this.phase === 'home') {
@@ -401,6 +408,21 @@ export class SkiEndlessGameScene extends Component {
     this.skierNode = this.skierNode ?? this.ensureChildNode(this.itemRoot, 'Skier', 4);
 
     this.ensureGraphics(this.skierNode);
+  }
+
+  private applyPortraitPresentation(): void {
+    if (this.canvasNode) {
+      const canvas = this.canvasNode.getComponent(Canvas);
+      if (canvas) {
+        (canvas as Canvas & { fitWidth?: boolean; fitHeight?: boolean }).fitWidth = true;
+        (canvas as Canvas & { fitWidth?: boolean; fitHeight?: boolean }).fitHeight = false;
+      }
+    }
+
+    const viewApi = view as unknown as {
+      setDesignResolutionSize?: (width: number, height: number, policy: number) => void;
+    };
+    viewApi.setDesignResolutionSize?.(720, 1280, ResolutionPolicy.FIXED_WIDTH);
   }
 
   private buildTrackVisuals(): void {
