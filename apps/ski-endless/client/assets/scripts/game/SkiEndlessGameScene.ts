@@ -11,6 +11,7 @@ import {
   Label,
   Node,
   UITransform,
+  Vec2,
   Vec3,
   input,
   view
@@ -24,6 +25,8 @@ const { ccclass, property } = _decorator;
 type LaneIndex = -1 | 0 | 1;
 type EntityKind = 'obstacle' | 'coin';
 type ObstacleType = 'tree' | 'rock' | 'gate';
+type ScenePhase = 'home' | 'running' | 'result';
+type ButtonActionId = 'start_run' | 'view_rank' | 'view_notice' | 'revive' | 'double_coin' | 'restart' | 'back_home';
 
 const PLAYER_Y = -235;
 const SPAWN_Y = 470;
@@ -60,6 +63,16 @@ interface StripeVisual {
   y: number;
 }
 
+interface UIButton {
+  id: ButtonActionId;
+  node: Node;
+  background: Graphics;
+  label: Label;
+  width: number;
+  height: number;
+  enabled: boolean;
+}
+
 @ccclass('SkiEndlessGameScene')
 export class SkiEndlessGameScene extends Component {
   @property(Label)
@@ -84,10 +97,22 @@ export class SkiEndlessGameScene extends Component {
   private spawnTimer = 0;
   private entities: TrackEntity[] = [];
   private stripes: StripeVisual[] = [];
+  private phase: ScenePhase = 'home';
+
   private canvasNode: Node | null = null;
   private backgroundRoot: Node | null = null;
   private itemRoot: Node | null = null;
   private overlayRoot: Node | null = null;
+  private homePanel: Node | null = null;
+  private resultPanel: Node | null = null;
+  private homeTitleLabel: Label | null = null;
+  private homeInfoLabel: Label | null = null;
+  private homeToastLabel: Label | null = null;
+  private resultTitleLabel: Label | null = null;
+  private resultInfoLabel: Label | null = null;
+
+  private homeButtons: UIButton[] = [];
+  private resultButtons: UIButton[] = [];
 
   start(): void {
     const runtimeSession = SkiRuntimeSessionStore.get();
@@ -103,8 +128,9 @@ export class SkiEndlessGameScene extends Component {
     this.ensureSceneNodes();
     this.applyDefaultLayout();
     this.buildTrackVisuals();
+    this.buildPanels();
     this.renderHint();
-    this.startNewRun();
+    this.showHomeScreen();
 
     input.on(Input.EventType.KEY_DOWN, this.onKeyDown, this);
     input.on(Input.EventType.TOUCH_START, this.onTouchStart, this);
@@ -118,7 +144,7 @@ export class SkiEndlessGameScene extends Component {
   update(deltaTime: number): void {
     this.updateTrackVisuals(deltaTime);
 
-    if (!this.runState || this.runState.finished) {
+    if (!this.runState || this.phase !== 'running' || this.runState.finished) {
       return;
     }
 
@@ -149,10 +175,34 @@ export class SkiEndlessGameScene extends Component {
       return;
     }
 
-    if (!this.runState) {
-      if (event.keyCode === KeyCode.KEY_R) {
+    if (this.phase === 'home') {
+      if (event.keyCode === KeyCode.ENTER || event.keyCode === KeyCode.SPACE) {
         this.startNewRun();
       }
+      return;
+    }
+
+    if (this.phase === 'result') {
+      switch (event.keyCode) {
+        case KeyCode.KEY_V:
+          void this.reviveRun();
+          return;
+        case KeyCode.KEY_C:
+          void this.claimDoubleCoins();
+          return;
+        case KeyCode.KEY_R:
+          this.startNewRun();
+          return;
+        case KeyCode.KEY_H:
+        case KeyCode.ESCAPE:
+          this.showHomeScreen();
+          return;
+        default:
+          return;
+      }
+    }
+
+    if (!this.runState) {
       return;
     }
 
@@ -168,33 +218,33 @@ export class SkiEndlessGameScene extends Component {
       case KeyCode.SPACE:
         void this.finishRun('manual_crash');
         break;
-      case KeyCode.KEY_R:
-        if (this.runState.finished) {
-          this.startNewRun();
-        }
-        break;
-      case KeyCode.KEY_V:
-        if (this.runState.finished && !this.runState.reviveUsed) {
-          void this.reviveRun();
-        }
-        break;
-      case KeyCode.KEY_C:
-        if (this.runState.finished && !this.runState.doubleClaimed && this.lastSummary && this.lastSummary.coinsCollected > 0) {
-          void this.claimDoubleCoins();
-        }
-        break;
       default:
         break;
     }
   }
 
   private onTouchStart(event: EventTouch): void {
-    if (!this.runState || this.runState.finished || this.busy) {
+    const location = event.getUILocation();
+
+    if (this.phase === 'home') {
+      if (this.tryHandleButtons(location, this.homeButtons)) {
+        return;
+      }
+      return;
+    }
+
+    if (this.phase === 'result') {
+      if (this.tryHandleButtons(location, this.resultButtons)) {
+        return;
+      }
+      return;
+    }
+
+    if (!this.runState || this.busy) {
       return;
     }
 
     const visibleSize = view.getVisibleSize();
-    const location = event.getUILocation();
     const sectionWidth = visibleSize.width / 3;
 
     if (location.x < sectionWidth) {
@@ -222,8 +272,8 @@ export class SkiEndlessGameScene extends Component {
     this.overlayRoot = this.ensureChildNode(this.canvasNode, 'OverlayRoot', -1);
 
     this.hudLabel = this.hudLabel ?? this.ensureLabelNode(this.overlayRoot, 'HudLabel', 26);
-    this.hintLabel = this.hintLabel ?? this.ensureLabelNode(this.overlayRoot, 'HintLabel', 26);
-    this.resultLabel = this.resultLabel ?? this.ensureLabelNode(this.overlayRoot, 'ResultLabel', 28);
+    this.hintLabel = this.hintLabel ?? this.ensureLabelNode(this.overlayRoot, 'HintLabel', 24);
+    this.resultLabel = this.resultLabel ?? this.ensureLabelNode(this.overlayRoot, 'ResultLabel', 24);
     this.skierNode = this.skierNode ?? this.ensureChildNode(this.itemRoot, 'Skier', 4);
 
     this.ensureGraphics(this.skierNode);
@@ -291,12 +341,97 @@ export class SkiEndlessGameScene extends Component {
     }
   }
 
+  private buildPanels(): void {
+    if (!this.overlayRoot) {
+      return;
+    }
+
+    this.homePanel = this.ensureChildNode(this.overlayRoot, 'HomePanel', 3);
+    this.resultPanel = this.ensureChildNode(this.overlayRoot, 'ResultPanel', 4);
+
+    const homeBackground = this.ensureGraphics(this.homePanel);
+    this.drawPanelBackground(homeBackground, 0, 40, 620, 520, new Color(10, 20, 34, 228));
+
+    const resultBackground = this.ensureGraphics(this.resultPanel);
+    this.drawPanelBackground(resultBackground, 0, -10, 640, 420, new Color(15, 18, 31, 230));
+
+    this.homeTitleLabel = this.ensureLabelNode(this.homePanel, 'HomeTitle', 52);
+    this.homeInfoLabel = this.ensureLabelNode(this.homePanel, 'HomeInfo', 28);
+    this.homeToastLabel = this.ensureLabelNode(this.homePanel, 'HomeToast', 22);
+    this.resultTitleLabel = this.ensureLabelNode(this.resultPanel, 'ResultTitle', 44);
+    this.resultInfoLabel = this.ensureLabelNode(this.resultPanel, 'ResultInfo', 26);
+
+    this.configureLabelNode(this.homeTitleLabel, new Vec3(0, 170, 0), HorizontalTextAlignment.CENTER, 520, 80, 52, 58);
+    this.configureLabelNode(this.homeInfoLabel, new Vec3(0, 60, 0), HorizontalTextAlignment.CENTER, 520, 210, 28, 34);
+    this.configureLabelNode(this.homeToastLabel, new Vec3(0, -155, 0), HorizontalTextAlignment.CENTER, 520, 70, 22, 28);
+    this.configureLabelNode(this.resultTitleLabel, new Vec3(0, 130, 0), HorizontalTextAlignment.CENTER, 520, 70, 44, 50);
+    this.configureLabelNode(this.resultInfoLabel, new Vec3(0, 25, 0), HorizontalTextAlignment.CENTER, 560, 180, 26, 32);
+
+    this.homeButtons = [
+      this.createButton(this.homePanel, 'StartButton', 'Start Run', new Vec3(0, -45, 0), 'start_run'),
+      this.createButton(this.homePanel, 'RankButton', 'Rank (Soon)', new Vec3(-150, -115, 0), 'view_rank', { width: 220, height: 56 }),
+      this.createButton(this.homePanel, 'NoticeButton', 'Notice (Soon)', new Vec3(150, -115, 0), 'view_notice', { width: 220, height: 56 })
+    ];
+
+    this.resultButtons = [
+      this.createButton(this.resultPanel, 'ReviveButton', 'Revive', new Vec3(-155, -95, 0), 'revive', { width: 220, height: 58 }),
+      this.createButton(this.resultPanel, 'DoubleButton', 'Double Coins', new Vec3(155, -95, 0), 'double_coin', { width: 220, height: 58 }),
+      this.createButton(this.resultPanel, 'RestartButton', 'Restart', new Vec3(-155, -165, 0), 'restart', { width: 220, height: 58 }),
+      this.createButton(this.resultPanel, 'HomeButton', 'Back Home', new Vec3(155, -165, 0), 'back_home', { width: 220, height: 58 })
+    ];
+  }
+
+  private showHomeScreen(): void {
+    this.phase = 'home';
+    this.clearEntities();
+    this.runState = null;
+    this.lastSummary = null;
+    this.busy = false;
+    this.homePanel && (this.homePanel.active = true);
+    this.resultPanel && (this.resultPanel.active = false);
+    this.savedCoinBank = this.controller?.getSnapshot().coins ?? this.savedCoinBank;
+
+    if (this.homeTitleLabel) {
+      this.homeTitleLabel.string = 'SKI ENDLESS';
+    }
+
+    if (this.homeInfoLabel && this.controller) {
+      const snapshot = this.controller.getSnapshot();
+      this.homeInfoLabel.string = [
+        `Welcome, user ${String(this.sessionUserId ?? 0)}`,
+        `Best Distance: ${String(snapshot.bestDistance)}m`,
+        `Best Score: ${String(snapshot.bestScore)}`,
+        `Coin Bank: ${String(snapshot.coins)}`,
+        '',
+        'Single-player endless prototype',
+        'One map, one mode, one revive, one double reward'
+      ].join('\n');
+    }
+
+    if (this.homeToastLabel) {
+      this.homeToastLabel.string = 'Tap Start to enter the slope';
+    }
+
+    this.hudLabel && (this.hudLabel.string = '');
+    this.hintLabel &&
+      (this.hintLabel.string = [
+        'Home',
+        '',
+        'Start Run: enter gameplay',
+        'Rank / Notice: placeholder entries',
+        '',
+        'This scene now acts as the player-facing home screen'
+      ].join('\n'));
+    this.resultLabel && (this.resultLabel.string = '');
+  }
+
   private startNewRun(): void {
     if (!this.controller) {
       return;
     }
 
     const start = this.controller.startRun();
+    this.phase = 'running';
     this.runState = {
       mode: start.mode,
       map: start.map,
@@ -313,8 +448,12 @@ export class SkiEndlessGameScene extends Component {
     this.lastSummary = null;
     this.lastCoinMilestone = 0;
     this.spawnTimer = 0;
+    this.busy = false;
     this.clearEntities();
-    this.resultLabel && (this.resultLabel.string = 'Run started\nTap left/right or use A/D to switch lanes.');
+    this.homePanel && (this.homePanel.active = false);
+    this.resultPanel && (this.resultPanel.active = false);
+    this.resultLabel && (this.resultLabel.string = 'Run started');
+    this.renderHint();
     this.updateSkierVisual(0);
     this.renderHud();
   }
@@ -403,7 +542,7 @@ export class SkiEndlessGameScene extends Component {
 
       this.positionEntity(entity);
 
-      if (this.runState && !this.runState.finished) {
+      if (this.runState && this.phase === 'running' && !this.runState.finished) {
         const isSameLane = entity.laneIndex === this.runState.laneIndex;
         const isNearPlayer = Math.abs(entity.y - PLAYER_Y) < entity.colliderRadius;
 
@@ -411,7 +550,7 @@ export class SkiEndlessGameScene extends Component {
           if (entity.kind === 'coin') {
             this.runState.coinsCollected += 1;
             entity.node.destroy();
-            this.resultLabel && (this.resultLabel.string = `Coin collected\ncoins=${String(this.runState.coinsCollected)}`);
+            this.resultLabel && (this.resultLabel.string = `Coin collected\nrunCoins=${String(this.runState.coinsCollected)}`);
             continue;
           }
 
@@ -441,19 +580,18 @@ export class SkiEndlessGameScene extends Component {
       });
       this.savedCoinBank = this.controller.getSnapshot().coins;
       this.runState.finished = true;
-      this.resultLabel &&
-        (this.resultLabel.string = [
-          'Run finished',
-          `hit=${crashedBy}`,
-          `distance=${String(this.lastSummary.distance)}`,
-          `score=${String(this.lastSummary.score)}`,
-          `coins=${String(this.lastSummary.coinsCollected)}`,
-          `savedCoinBank=${String(this.savedCoinBank)}`,
-          'V: revive once',
-          'C: claim double coins',
-          'R: restart run'
-        ].join('\n'));
+      this.phase = 'result';
+      this.resultPanel && (this.resultPanel.active = true);
+      this.homePanel && (this.homePanel.active = false);
+
+      if (this.resultTitleLabel) {
+        this.resultTitleLabel.string = 'Run Finished';
+      }
+
+      this.renderResultInfo(crashedBy);
+      this.updateResultButtons();
       this.renderHud();
+      this.renderHint();
     } finally {
       this.busy = false;
     }
@@ -472,6 +610,7 @@ export class SkiEndlessGameScene extends Component {
         return;
       }
 
+      this.phase = 'running';
       this.runState.finished = false;
       this.runState.reviveUsed = true;
       this.runState.speed = Math.max(this.runState.baseSpeed, this.runState.speed * 0.72);
@@ -481,8 +620,10 @@ export class SkiEndlessGameScene extends Component {
         }
       });
       this.entities = this.entities.filter((entity) => Math.abs(entity.y - PLAYER_Y) >= 140);
+      this.resultPanel && (this.resultPanel.active = false);
       this.resultLabel && (this.resultLabel.string = `Revived\nverification=${verification.verificationId}`);
       this.renderHud();
+      this.renderHint();
     } finally {
       this.busy = false;
     }
@@ -497,21 +638,25 @@ export class SkiEndlessGameScene extends Component {
     try {
       const reward = await this.controller.claimDoubleCoinReward(this.lastSummary.coinsCollected);
       this.runState.doubleClaimed = true;
-      this.resultLabel &&
-        (this.resultLabel.string = [
-          this.resultLabel.string,
-          'double-coin claimed',
+      this.savedCoinBank = reward.balanceAfter;
+      this.renderResultInfo('reward_ad');
+      this.resultInfoLabel &&
+        (this.resultInfoLabel.string = [
+          this.resultInfoLabel.string,
+          '',
+          'Double reward claimed',
           `rewardType=${reward.rewardType}`,
           `amount=${String(reward.amount)}`,
           `balanceAfter=${String(reward.balanceAfter)}`
         ].join('\n'));
+      this.updateResultButtons();
     } finally {
       this.busy = false;
     }
   }
 
   private updateTrackVisuals(deltaTime: number): void {
-    if (!this.runState) {
+    if (!this.runState || this.phase === 'home') {
       return;
     }
 
@@ -536,8 +681,8 @@ export class SkiEndlessGameScene extends Component {
       return;
     }
 
-    if (!this.runState) {
-      this.hudLabel.string = 'No active run';
+    if (!this.runState || this.phase === 'home') {
+      this.hudLabel.string = '';
       return;
     }
 
@@ -559,27 +704,79 @@ export class SkiEndlessGameScene extends Component {
       return;
     }
 
+    if (this.phase === 'home') {
+      this.hintLabel.string = [
+        'Home',
+        '',
+        'Tap Start Run to enter gameplay',
+        'Touch left/right while playing to switch lanes',
+        'Touch center to force finish',
+        '',
+        'Keyboard also works in preview'
+      ].join('\n');
+      return;
+    }
+
+    if (this.phase === 'result') {
+      this.hintLabel.string = [
+        'Result',
+        '',
+        'Revive: available once',
+        'Double Coins: after finish',
+        'Restart: immediate replay',
+        'Back Home: return to menu',
+        '',
+        'Keyboard: V / C / R / H'
+      ].join('\n');
+      return;
+    }
+
     this.hintLabel.string = [
-      'Desktop:',
-      'A / Left = left lane',
-      'D / Right = right lane',
-      'Space = force finish',
+      'Gameplay',
       '',
-      'Mobile:',
-      'Tap left / right side to switch',
-      'Tap center to finish',
+      'Desktop: A / D or Left / Right',
+      'Mobile: tap left / right side',
+      'Center tap or Space = finish run',
       '',
-      'After finish:',
-      'V = revive once',
-      'C = double coins',
-      'R = restart'
+      'Avoid trees, rocks, gates',
+      'Collect coins on safe lines'
     ].join('\n');
   }
 
+  private renderResultInfo(crashedBy: string): void {
+    if (!this.resultInfoLabel || !this.lastSummary || !this.runState) {
+      return;
+    }
+
+    this.resultInfoLabel.string = [
+      `Hit: ${crashedBy}`,
+      `Distance: ${String(this.lastSummary.distance)}m`,
+      `Score: ${String(this.lastSummary.score)}`,
+      `Run Coins: ${String(this.lastSummary.coinsCollected)}`,
+      `Saved Coin Bank: ${String(this.savedCoinBank)}`,
+      `Best Distance: ${String(this.lastSummary.bestDistance)}m`,
+      `Best Score: ${String(this.lastSummary.bestScore)}`,
+      '',
+      `Revive Used: ${String(this.runState.reviveUsed)}`,
+      `Double Claimed: ${String(this.runState.doubleClaimed)}`
+    ].join('\n');
+  }
+
+  private updateResultButtons(): void {
+    if (!this.runState) {
+      return;
+    }
+
+    this.setButtonEnabled(this.resultButtons, 'revive', !this.runState.reviveUsed);
+    this.setButtonEnabled(this.resultButtons, 'double_coin', !this.runState.doubleClaimed && (this.lastSummary?.coinsCollected ?? 0) > 0);
+    this.setButtonEnabled(this.resultButtons, 'restart', true);
+    this.setButtonEnabled(this.resultButtons, 'back_home', true);
+  }
+
   private applyDefaultLayout(): void {
-    this.configureLabelNode(this.hudLabel, new Vec3(-480, 245, 0), HorizontalTextAlignment.LEFT, 360, 270);
-    this.configureLabelNode(this.hintLabel, new Vec3(310, 220, 0), HorizontalTextAlignment.LEFT, 340, 320);
-    this.configureLabelNode(this.resultLabel, new Vec3(-470, -160, 0), HorizontalTextAlignment.LEFT, 420, 250);
+    this.configureLabelNode(this.hudLabel, new Vec3(-480, 245, 0), HorizontalTextAlignment.LEFT, 360, 270, 26, 32);
+    this.configureLabelNode(this.hintLabel, new Vec3(330, 225, 0), HorizontalTextAlignment.LEFT, 340, 300, 24, 30);
+    this.configureLabelNode(this.resultLabel, new Vec3(-470, -220, 0), HorizontalTextAlignment.LEFT, 420, 160, 22, 28);
 
     if (this.skierNode) {
       this.skierNode.setPosition(0, PLAYER_Y, 0);
@@ -600,8 +797,74 @@ export class SkiEndlessGameScene extends Component {
       return;
     }
 
+    this.skierNode.active = this.phase !== 'home';
     this.skierNode.setPosition(this.getLaneX(laneIndex, 0.98), PLAYER_Y, 0);
     this.skierNode.angle = -laneIndex * 6;
+  }
+
+  private tryHandleButtons(location: Vec2, buttons: UIButton[]): boolean {
+    for (const button of buttons) {
+      if (!button.enabled || !button.node.active) {
+        continue;
+      }
+
+      const transform = button.node.getComponent(UITransform);
+      if (!transform) {
+        continue;
+      }
+
+      const rect = transform.getBoundingBoxToWorld();
+      if (rect.contains(location)) {
+        this.handleButtonAction(button.id);
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  private handleButtonAction(action: ButtonActionId): void {
+    switch (action) {
+      case 'start_run':
+        this.startNewRun();
+        break;
+      case 'view_rank':
+        this.homeToastLabel && (this.homeToastLabel.string = 'Rank page will be wired after gameplay polish.');
+        break;
+      case 'view_notice':
+        this.homeToastLabel && (this.homeToastLabel.string = 'Notice page will be wired after gameplay polish.');
+        break;
+      case 'revive':
+        void this.reviveRun();
+        break;
+      case 'double_coin':
+        void this.claimDoubleCoins();
+        break;
+      case 'restart':
+        this.startNewRun();
+        break;
+      case 'back_home':
+        this.showHomeScreen();
+        break;
+      default:
+        break;
+    }
+  }
+
+  private setButtonEnabled(buttons: UIButton[], id: ButtonActionId, enabled: boolean): void {
+    const target = buttons.find((button) => button.id === id);
+    if (!target) {
+      return;
+    }
+
+    target.enabled = enabled;
+    this.drawButtonBackground(
+      target.background,
+      enabled ? new Color(45, 103, 214, 255) : new Color(72, 77, 90, 255),
+      target.width,
+      target.height
+    );
+    target.label.color = enabled ? new Color(255, 255, 255, 255) : new Color(185, 188, 196, 255);
   }
 
   private configureLabelNode(
@@ -609,7 +872,9 @@ export class SkiEndlessGameScene extends Component {
     position: Vec3,
     align: HorizontalTextAlignment,
     width: number,
-    height: number
+    height: number,
+    fontSize: number,
+    lineHeight: number
   ): void {
     if (!label) {
       return;
@@ -619,8 +884,8 @@ export class SkiEndlessGameScene extends Component {
     label.horizontalAlign = align;
     label.overflow = Label.Overflow.SHRINK;
     label.color = new Color(255, 255, 255, 255);
-    label.fontSize = 24;
-    label.lineHeight = 28;
+    label.fontSize = fontSize;
+    label.lineHeight = lineHeight;
 
     const transform = label.getComponent(UITransform);
     if (transform) {
@@ -710,6 +975,55 @@ export class SkiEndlessGameScene extends Component {
     }
 
     return graphics;
+  }
+
+  private createButton(
+    parent: Node,
+    name: string,
+    text: string,
+    position: Vec3,
+    id: ButtonActionId,
+    size: { width: number; height: number } = { width: 300, height: 62 }
+  ): UIButton {
+    const node = this.ensureChildNode(parent, name, 12);
+    node.setPosition(position);
+    const transform = node.getComponent(UITransform) ?? node.addComponent(UITransform);
+    transform.setContentSize(size.width, size.height);
+    const background = this.ensureGraphics(node);
+    this.drawButtonBackground(background, new Color(45, 103, 214, 255), size.width, size.height);
+
+    const label = this.ensureLabelNode(node, `${name}Label`, 26);
+    this.configureLabelNode(label, new Vec3(0, 0, 0), HorizontalTextAlignment.CENTER, size.width - 20, size.height - 10, 26, 30);
+    label.string = text;
+
+    return {
+      id,
+      node,
+      background,
+      label,
+      width: size.width,
+      height: size.height,
+      enabled: true
+    };
+  }
+
+  private drawButtonBackground(graphics: Graphics, color: Color, width = 300, height = 62): void {
+    graphics.clear();
+    graphics.fillColor = color;
+    graphics.roundRect(-width / 2, -height / 2, width, height, 18);
+    graphics.fill();
+  }
+
+  private drawPanelBackground(graphics: Graphics, x: number, y: number, width: number, height: number, color: Color): void {
+    graphics.clear();
+    graphics.fillColor = color;
+    graphics.roundRect(x - width / 2, y - height / 2, width, height, 28);
+    graphics.fill();
+
+    graphics.strokeColor = new Color(255, 255, 255, 40);
+    graphics.lineWidth = 3;
+    graphics.roundRect(x - width / 2, y - height / 2, width, height, 28);
+    graphics.stroke();
   }
 
   private drawRect(node: Node, x: number, y: number, width: number, height: number, color: Color): void {
