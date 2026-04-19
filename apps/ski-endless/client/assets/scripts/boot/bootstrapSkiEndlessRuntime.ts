@@ -1,15 +1,19 @@
 import {
   type CoreRuntime,
   WebMockPlatformAdapter,
+  WechatPlatformAdapter,
+  createWechatRequestImpl,
   createAdManager,
   createAnalyticsManager,
   createConfigManager,
   createCoreRuntime,
   createNetworkManager,
-  createSaveManager
+  createSaveManager,
+  isWechatMiniGameRuntime
 } from '@mini-game-workflow/game-core-client';
-import type { ConfigEnvelope, RemoteConfigRequestContext } from '@mini-game-workflow/game-core-types';
+import type { ConfigEnvelope, NetworkRequestImpl, RemoteConfigRequestContext } from '@mini-game-workflow/game-core-types';
 import { skiEndlessGameConfig } from '../app/SkiEndlessGameConfig';
+import { skiEndlessPlatformConfig } from '../app/SkiEndlessPlatformConfig';
 import { localSkiEndlessConfig, type SkiEndlessConfig } from '../config/SkiEndlessConfig';
 import { skiEndlessSaveDefinition, type SkiEndlessSaveData } from '../data/SkiEndlessSave';
 
@@ -37,7 +41,9 @@ interface RemoteSaveResponse {
 export interface BootstrapSkiEndlessRuntimeOptions {
   baseURL?: string;
   fetchImpl?: typeof fetch;
+  requestImpl?: NetworkRequestImpl;
   clientVersion?: string;
+  platformOverride?: 'web' | 'wechat';
 }
 
 export interface BootstrapSkiEndlessRuntimeResult {
@@ -48,20 +54,36 @@ export interface BootstrapSkiEndlessRuntimeResult {
 export async function bootstrapSkiEndlessRuntime(
   options: BootstrapSkiEndlessRuntimeOptions = {}
 ): Promise<BootstrapSkiEndlessRuntimeResult> {
-  const platform = new WebMockPlatformAdapter();
+  const useWechat = options.platformOverride === 'wechat' || (options.platformOverride !== 'web' && isWechatMiniGameRuntime());
+  const platform = useWechat
+    ? new WechatPlatformAdapter({
+        rewardedVideoAdUnitIds: skiEndlessPlatformConfig.wechat.rewardedVideoAdUnitIds
+      })
+    : new WebMockPlatformAdapter();
   const network = createNetworkManager();
   const config = createConfigManager<SkiEndlessConfig>();
   const save = createSaveManager(skiEndlessSaveDefinition);
   const clientVersion = options.clientVersion ?? '0.1.0';
   let token: string | undefined;
+  const baseURL =
+    options.baseURL ??
+    (useWechat ? skiEndlessPlatformConfig.wechat.apiBaseURL : skiEndlessPlatformConfig.web.apiBaseURL);
+  const requestImpl =
+    options.requestImpl ??
+    (useWechat ? createWechatRequestImpl() : undefined);
+
+  if (useWechat && baseURL.includes('replace-with-your-mini-game-api')) {
+    throw new Error('请先在 SkiEndlessPlatformConfig.ts 中填写微信小游戏 API 地址。');
+  }
 
   network.init({
-    baseURL: options.baseURL ?? 'http://127.0.0.1:3000',
+    baseURL,
     gameKey: skiEndlessGameConfig.gameKey,
     platform: platform.getPlatform(),
     clientVersion,
     getToken: () => token,
-    fetchImpl: options.fetchImpl
+    fetchImpl: options.fetchImpl,
+    requestImpl
   });
 
   const analytics = createAnalyticsManager(network);

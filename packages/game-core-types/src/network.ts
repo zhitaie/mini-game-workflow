@@ -1,3 +1,20 @@
+export interface NetworkTransportResponse {
+  status: number;
+  json(): Promise<unknown>;
+}
+
+export interface NetworkTransportInit {
+  method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+  headers: Record<string, string>;
+  body?: string;
+  timeoutMs?: number;
+}
+
+export type NetworkRequestImpl = (
+  url: string,
+  init: NetworkTransportInit
+) => Promise<NetworkTransportResponse>;
+
 export interface NetworkContext {
   baseURL: string;
   gameKey: string;
@@ -5,6 +22,7 @@ export interface NetworkContext {
   clientVersion: string;
   getToken?: () => string | undefined;
   fetchImpl?: typeof fetch;
+  requestImpl?: NetworkRequestImpl;
 }
 
 export interface NetworkRequestOptions {

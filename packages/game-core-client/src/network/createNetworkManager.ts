@@ -40,12 +40,20 @@ export function createNetworkManager(): NetworkManager {
         headers.Authorization = `Bearer ${token}`;
       }
 
-      const fetchImpl = context.fetchImpl ?? fetch;
-      const response = await fetchImpl(buildURL(context.baseURL, options.path, options.query), {
-        method: options.method,
-        headers,
-        body: options.body === undefined ? undefined : JSON.stringify(options.body)
-      });
+      const url = buildURL(context.baseURL, options.path, options.query);
+      const body = options.body === undefined ? undefined : JSON.stringify(options.body);
+      const response = context.requestImpl
+        ? await context.requestImpl(url, {
+            method: options.method,
+            headers,
+            body,
+            timeoutMs: options.timeoutMs
+          })
+        : await (context.fetchImpl ?? fetch)(url, {
+            method: options.method,
+            headers,
+            body
+          });
 
       const payload = (await response.json()) as ApiResponse<TData>;
 
