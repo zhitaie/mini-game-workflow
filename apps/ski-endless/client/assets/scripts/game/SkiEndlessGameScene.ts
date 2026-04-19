@@ -63,6 +63,13 @@ interface StripeVisual {
   y: number;
 }
 
+interface AmbientSnowParticle {
+  node: Node;
+  x: number;
+  y: number;
+  speed: number;
+}
+
 interface UIButton {
   id: ButtonActionId;
   node: Node;
@@ -70,7 +77,17 @@ interface UIButton {
   label: Label;
   width: number;
   height: number;
+  activeColor: Color;
+  disabledColor: Color;
   enabled: boolean;
+}
+
+interface UIStatCard {
+  id: 'distance' | 'coins' | 'speed';
+  node: Node;
+  background: Graphics;
+  titleLabel: Label;
+  valueLabel: Label;
 }
 
 @ccclass('SkiEndlessGameScene')
@@ -97,6 +114,7 @@ export class SkiEndlessGameScene extends Component {
   private spawnTimer = 0;
   private entities: TrackEntity[] = [];
   private stripes: StripeVisual[] = [];
+  private snowParticles: AmbientSnowParticle[] = [];
   private phase: ScenePhase = 'home';
 
   private canvasNode: Node | null = null;
@@ -108,11 +126,14 @@ export class SkiEndlessGameScene extends Component {
   private homeTitleLabel: Label | null = null;
   private homeInfoLabel: Label | null = null;
   private homeToastLabel: Label | null = null;
+  private homeBadgeLabel: Label | null = null;
   private resultTitleLabel: Label | null = null;
   private resultInfoLabel: Label | null = null;
+  private hudPanelRoot: Node | null = null;
 
   private homeButtons: UIButton[] = [];
   private resultButtons: UIButton[] = [];
+  private hudCards: UIStatCard[] = [];
 
   start(): void {
     const runtimeSession = SkiRuntimeSessionStore.get();
@@ -288,9 +309,46 @@ export class SkiEndlessGameScene extends Component {
     this.itemRoot.removeAllChildren();
     this.entities = [];
     this.stripes = [];
+    this.snowParticles = [];
 
     const skyNode = this.createGraphicsNode('Sky', this.backgroundRoot, -5);
-    this.drawRect(skyNode, 0, 160, 1280, 560, new Color(122, 181, 235, 255));
+    this.drawRect(skyNode, 0, 150, 1280, 620, new Color(122, 181, 235, 255));
+
+    const upperSkyNode = this.createGraphicsNode('UpperSky', this.backgroundRoot, -4);
+    this.drawRect(upperSkyNode, 0, 285, 1280, 250, new Color(75, 137, 212, 255));
+
+    const sunNode = this.createGraphicsNode('Sun', this.backgroundRoot, -3);
+    const sunGraphics = this.ensureGraphics(sunNode);
+    sunGraphics.clear();
+    sunGraphics.fillColor = new Color(255, 238, 178, 255);
+    sunGraphics.circle(390, 210, 56);
+    sunGraphics.fill();
+
+    const mountainFar = this.createGraphicsNode('MountainFar', this.backgroundRoot, -2);
+    this.drawMountainRange(mountainFar, 118, 240, new Color(180, 204, 228, 255), [
+      [-650, 20],
+      [-500, 140],
+      [-360, 50],
+      [-180, 190],
+      [20, 70],
+      [180, 170],
+      [360, 55],
+      [520, 155],
+      [650, 30]
+    ]);
+
+    const mountainNear = this.createGraphicsNode('MountainNear', this.backgroundRoot, -1);
+    this.drawMountainRange(mountainNear, 72, 220, new Color(214, 230, 245, 255), [
+      [-650, 0],
+      [-520, 110],
+      [-360, 40],
+      [-240, 135],
+      [-60, 30],
+      [120, 120],
+      [280, 28],
+      [420, 132],
+      [650, 10]
+    ]);
 
     const trackNode = this.createGraphicsNode('Track', this.backgroundRoot, 0);
     const trackGraphics = this.ensureGraphics(trackNode);
@@ -332,6 +390,9 @@ export class SkiEndlessGameScene extends Component {
     this.drawLaneGuide(leftGuide, -1);
     this.drawLaneGuide(rightGuide, 1);
 
+    this.buildSideDecorations();
+    this.buildAmbientSnow();
+
     this.skierNode = this.ensureChildNode(this.itemRoot, 'Skier', 4);
     const skierGraphic = this.ensureGraphics(this.skierNode);
     this.drawSkier(skierGraphic);
@@ -346,38 +407,69 @@ export class SkiEndlessGameScene extends Component {
       return;
     }
 
+    this.hudPanelRoot = this.ensureChildNode(this.overlayRoot, 'HudPanelRoot', 2);
     this.homePanel = this.ensureChildNode(this.overlayRoot, 'HomePanel', 3);
     this.resultPanel = this.ensureChildNode(this.overlayRoot, 'ResultPanel', 4);
 
+    this.hudPanelRoot.removeAllChildren();
     const homeBackground = this.ensureGraphics(this.homePanel);
-    this.drawPanelBackground(homeBackground, 0, 40, 620, 520, new Color(10, 20, 34, 228));
+    this.drawPanelBackground(homeBackground, 0, 32, 650, 540, new Color(11, 23, 39, 232));
 
     const resultBackground = this.ensureGraphics(this.resultPanel);
-    this.drawPanelBackground(resultBackground, 0, -10, 640, 420, new Color(15, 18, 31, 230));
+    this.drawPanelBackground(resultBackground, 0, -6, 650, 438, new Color(14, 22, 36, 234));
 
     this.homeTitleLabel = this.ensureLabelNode(this.homePanel, 'HomeTitle', 52);
+    this.homeBadgeLabel = this.ensureLabelNode(this.homePanel, 'HomeBadge', 20);
     this.homeInfoLabel = this.ensureLabelNode(this.homePanel, 'HomeInfo', 28);
     this.homeToastLabel = this.ensureLabelNode(this.homePanel, 'HomeToast', 22);
     this.resultTitleLabel = this.ensureLabelNode(this.resultPanel, 'ResultTitle', 44);
     this.resultInfoLabel = this.ensureLabelNode(this.resultPanel, 'ResultInfo', 26);
 
-    this.configureLabelNode(this.homeTitleLabel, new Vec3(0, 170, 0), HorizontalTextAlignment.CENTER, 520, 80, 52, 58);
-    this.configureLabelNode(this.homeInfoLabel, new Vec3(0, 60, 0), HorizontalTextAlignment.CENTER, 520, 210, 28, 34);
-    this.configureLabelNode(this.homeToastLabel, new Vec3(0, -155, 0), HorizontalTextAlignment.CENTER, 520, 70, 22, 28);
-    this.configureLabelNode(this.resultTitleLabel, new Vec3(0, 130, 0), HorizontalTextAlignment.CENTER, 520, 70, 44, 50);
-    this.configureLabelNode(this.resultInfoLabel, new Vec3(0, 25, 0), HorizontalTextAlignment.CENTER, 560, 180, 26, 32);
+    this.configureLabelNode(this.homeTitleLabel, new Vec3(0, 178, 0), HorizontalTextAlignment.CENTER, 520, 80, 56, 62);
+    this.configureLabelNode(this.homeBadgeLabel, new Vec3(0, 120, 0), HorizontalTextAlignment.CENTER, 430, 46, 20, 24);
+    this.configureLabelNode(this.homeInfoLabel, new Vec3(0, 38, 0), HorizontalTextAlignment.CENTER, 560, 220, 28, 36);
+    this.configureLabelNode(this.homeToastLabel, new Vec3(0, -170, 0), HorizontalTextAlignment.CENTER, 560, 72, 22, 28);
+    this.configureLabelNode(this.resultTitleLabel, new Vec3(0, 140, 0), HorizontalTextAlignment.CENTER, 520, 70, 46, 52);
+    this.configureLabelNode(this.resultInfoLabel, new Vec3(0, 28, 0), HorizontalTextAlignment.CENTER, 560, 190, 26, 32);
 
     this.homeButtons = [
-      this.createButton(this.homePanel, 'StartButton', 'Start Run', new Vec3(0, -45, 0), 'start_run'),
-      this.createButton(this.homePanel, 'RankButton', 'Rank (Soon)', new Vec3(-150, -115, 0), 'view_rank', { width: 220, height: 56 }),
-      this.createButton(this.homePanel, 'NoticeButton', 'Notice (Soon)', new Vec3(150, -115, 0), 'view_notice', { width: 220, height: 56 })
+      this.createButton(this.homePanel, 'StartButton', 'Start Run', new Vec3(0, -58, 0), 'start_run', { width: 320, height: 66 }, {
+        activeColor: new Color(20, 152, 108, 255),
+        disabledColor: new Color(77, 92, 92, 255)
+      }),
+      this.createButton(this.homePanel, 'RankButton', 'Rank (Soon)', new Vec3(-150, -134, 0), 'view_rank', { width: 220, height: 56 }, {
+        activeColor: new Color(43, 87, 162, 255),
+        disabledColor: new Color(77, 84, 97, 255)
+      }),
+      this.createButton(this.homePanel, 'NoticeButton', 'Notice (Soon)', new Vec3(150, -134, 0), 'view_notice', { width: 220, height: 56 }, {
+        activeColor: new Color(54, 99, 173, 255),
+        disabledColor: new Color(77, 84, 97, 255)
+      })
     ];
 
     this.resultButtons = [
-      this.createButton(this.resultPanel, 'ReviveButton', 'Revive', new Vec3(-155, -95, 0), 'revive', { width: 220, height: 58 }),
-      this.createButton(this.resultPanel, 'DoubleButton', 'Double Coins', new Vec3(155, -95, 0), 'double_coin', { width: 220, height: 58 }),
-      this.createButton(this.resultPanel, 'RestartButton', 'Restart', new Vec3(-155, -165, 0), 'restart', { width: 220, height: 58 }),
-      this.createButton(this.resultPanel, 'HomeButton', 'Back Home', new Vec3(155, -165, 0), 'back_home', { width: 220, height: 58 })
+      this.createButton(this.resultPanel, 'ReviveButton', 'Revive', new Vec3(-155, -102, 0), 'revive', { width: 220, height: 58 }, {
+        activeColor: new Color(245, 154, 33, 255),
+        disabledColor: new Color(97, 89, 72, 255)
+      }),
+      this.createButton(this.resultPanel, 'DoubleButton', 'Double Coins', new Vec3(155, -102, 0), 'double_coin', { width: 220, height: 58 }, {
+        activeColor: new Color(47, 113, 224, 255),
+        disabledColor: new Color(77, 84, 97, 255)
+      }),
+      this.createButton(this.resultPanel, 'RestartButton', 'Restart', new Vec3(-155, -174, 0), 'restart', { width: 220, height: 58 }, {
+        activeColor: new Color(31, 163, 134, 255),
+        disabledColor: new Color(77, 84, 97, 255)
+      }),
+      this.createButton(this.resultPanel, 'HomeButton', 'Back Home', new Vec3(155, -174, 0), 'back_home', { width: 220, height: 58 }, {
+        activeColor: new Color(87, 95, 120, 255),
+        disabledColor: new Color(77, 84, 97, 255)
+      })
+    ];
+
+    this.hudCards = [
+      this.createStatCard(this.hudPanelRoot, 'DistanceCard', 'Distance', new Vec3(-245, 292, 0), new Color(52, 116, 215, 230)),
+      this.createStatCard(this.hudPanelRoot, 'CoinCard', 'Coins', new Vec3(0, 292, 0), new Color(221, 162, 37, 230)),
+      this.createStatCard(this.hudPanelRoot, 'SpeedCard', 'Speed', new Vec3(245, 292, 0), new Color(36, 152, 126, 230))
     ];
   }
 
@@ -395,16 +487,21 @@ export class SkiEndlessGameScene extends Component {
       this.homeTitleLabel.string = 'SKI ENDLESS';
     }
 
+    if (this.homeBadgeLabel) {
+      this.homeBadgeLabel.string = 'SNOWFIELD   /   ENDLESS   /   SOLO';
+      this.homeBadgeLabel.color = new Color(194, 223, 246, 255);
+    }
+
     if (this.homeInfoLabel && this.controller) {
       const snapshot = this.controller.getSnapshot();
       this.homeInfoLabel.string = [
-        `Welcome, user ${String(this.sessionUserId ?? 0)}`,
-        `Best Distance: ${String(snapshot.bestDistance)}m`,
-        `Best Score: ${String(snapshot.bestScore)}`,
-        `Coin Bank: ${String(snapshot.coins)}`,
+        `Welcome back, Rider ${String(this.sessionUserId ?? 0)}`,
+        `Best Distance  ${String(snapshot.bestDistance)}m`,
+        `Best Score     ${String(snapshot.bestScore)}`,
+        `Coin Bank      ${String(snapshot.coins)}`,
         '',
-        'Single-player endless prototype',
-        'One map, one mode, one revive, one double reward'
+        'Slide through the snowfield, dodge obstacles,',
+        'collect coins, and push your farthest run.'
       ].join('\n');
     }
 
@@ -413,14 +510,13 @@ export class SkiEndlessGameScene extends Component {
     }
 
     this.hudLabel && (this.hudLabel.string = '');
+    this.hudPanelRoot && (this.hudPanelRoot.active = false);
     this.hintLabel &&
       (this.hintLabel.string = [
-        'Home',
+        'Tap Start to hit the slope',
         '',
-        'Start Run: enter gameplay',
-        'Rank / Notice: placeholder entries',
-        '',
-        'This scene now acts as the player-facing home screen'
+        'Touch left / right while playing',
+        'to switch lanes around obstacles.'
       ].join('\n'));
     this.resultLabel && (this.resultLabel.string = '');
   }
@@ -452,7 +548,8 @@ export class SkiEndlessGameScene extends Component {
     this.clearEntities();
     this.homePanel && (this.homePanel.active = false);
     this.resultPanel && (this.resultPanel.active = false);
-    this.resultLabel && (this.resultLabel.string = 'Run started');
+    this.hudPanelRoot && (this.hudPanelRoot.active = true);
+    this.resultLabel && (this.resultLabel.string = 'Stay smooth. The slope gets faster.');
     this.renderHint();
     this.updateSkierVisual(0);
     this.renderHud();
@@ -583,6 +680,7 @@ export class SkiEndlessGameScene extends Component {
       this.phase = 'result';
       this.resultPanel && (this.resultPanel.active = true);
       this.homePanel && (this.homePanel.active = false);
+      this.hudPanelRoot && (this.hudPanelRoot.active = true);
 
       if (this.resultTitleLabel) {
         this.resultTitleLabel.string = 'Run Finished';
@@ -622,6 +720,7 @@ export class SkiEndlessGameScene extends Component {
       this.entities = this.entities.filter((entity) => Math.abs(entity.y - PLAYER_Y) >= 140);
       this.resultPanel && (this.resultPanel.active = false);
       this.resultLabel && (this.resultLabel.string = `Revived\nverification=${verification.verificationId}`);
+      this.hudPanelRoot && (this.hudPanelRoot.active = true);
       this.renderHud();
       this.renderHint();
     } finally {
@@ -674,6 +773,14 @@ export class SkiEndlessGameScene extends Component {
       stripe.node.setPosition(0, stripe.y, 0);
       stripe.node.setScale(halfWidth / 120, 1 + progress * 1.8, 1);
     }
+
+    for (const particle of this.snowParticles) {
+      particle.y -= particle.speed * deltaTime;
+      if (particle.y < -380) {
+        particle.y = 390 + Math.random() * 120;
+      }
+      particle.node.setPosition(particle.x, particle.y, 0);
+    }
   }
 
   private renderHud(): void {
@@ -692,11 +799,13 @@ export class SkiEndlessGameScene extends Component {
       `map=${this.runState.map}`,
       `distance=${String(Math.floor(this.runState.distance))}m`,
       `speed=${this.runState.speed.toFixed(1)}`,
-      `runCoins=${String(this.runState.coinsCollected)}`,
-      `bankedCoins=${String(this.savedCoinBank)}`,
       `lane=${String(this.runState.laneIndex)}`,
-      `reviveUsed=${String(this.runState.reviveUsed)}`
+      `revive=${this.runState.reviveUsed ? 'used' : 'ready'}`
     ].join('\n');
+
+    this.setStatCardValue('distance', `${String(Math.floor(this.runState.distance))}m`);
+    this.setStatCardValue('coins', `${String(this.runState.coinsCollected)}`);
+    this.setStatCardValue('speed', `${this.runState.speed.toFixed(1)}x`);
   }
 
   private renderHint(): void {
@@ -706,25 +815,18 @@ export class SkiEndlessGameScene extends Component {
 
     if (this.phase === 'home') {
       this.hintLabel.string = [
-        'Home',
-        '',
         'Tap Start Run to enter gameplay',
-        'Touch left/right while playing to switch lanes',
-        'Touch center to force finish',
+        'Swipe or tap left / right to switch lanes',
         '',
-        'Keyboard also works in preview'
+        'Keep a clean line and hold your nerve.'
       ].join('\n');
       return;
     }
 
     if (this.phase === 'result') {
       this.hintLabel.string = [
-        'Result',
-        '',
-        'Revive: available once',
-        'Double Coins: after finish',
-        'Restart: immediate replay',
-        'Back Home: return to menu',
+        'Revive once, double your coins,',
+        'or jump straight into the next run.',
         '',
         'Keyboard: V / C / R / H'
       ].join('\n');
@@ -732,14 +834,11 @@ export class SkiEndlessGameScene extends Component {
     }
 
     this.hintLabel.string = [
-      'Gameplay',
-      '',
-      'Desktop: A / D or Left / Right',
-      'Mobile: tap left / right side',
-      'Center tap or Space = finish run',
-      '',
-      'Avoid trees, rocks, gates',
-      'Collect coins on safe lines'
+        'Desktop: A / D or Left / Right',
+        'Mobile: tap left / right edge',
+        '',
+        'Avoid trees, rocks, gates',
+        'Collect coins on safe lines'
     ].join('\n');
   }
 
@@ -749,16 +848,16 @@ export class SkiEndlessGameScene extends Component {
     }
 
     this.resultInfoLabel.string = [
-      `Hit: ${crashedBy}`,
-      `Distance: ${String(this.lastSummary.distance)}m`,
-      `Score: ${String(this.lastSummary.score)}`,
-      `Run Coins: ${String(this.lastSummary.coinsCollected)}`,
-      `Saved Coin Bank: ${String(this.savedCoinBank)}`,
-      `Best Distance: ${String(this.lastSummary.bestDistance)}m`,
-      `Best Score: ${String(this.lastSummary.bestScore)}`,
+      `Impact: ${crashedBy}`,
+      `Distance        ${String(this.lastSummary.distance)}m`,
+      `Score           ${String(this.lastSummary.score)}`,
+      `Run Coins       ${String(this.lastSummary.coinsCollected)}`,
+      `Coin Bank       ${String(this.savedCoinBank)}`,
+      `Best Distance   ${String(this.lastSummary.bestDistance)}m`,
+      `Best Score      ${String(this.lastSummary.bestScore)}`,
       '',
-      `Revive Used: ${String(this.runState.reviveUsed)}`,
-      `Double Claimed: ${String(this.runState.doubleClaimed)}`
+      `Revive Used     ${String(this.runState.reviveUsed)}`,
+      `Double Claimed  ${String(this.runState.doubleClaimed)}`
     ].join('\n');
   }
 
@@ -774,9 +873,21 @@ export class SkiEndlessGameScene extends Component {
   }
 
   private applyDefaultLayout(): void {
-    this.configureLabelNode(this.hudLabel, new Vec3(-480, 245, 0), HorizontalTextAlignment.LEFT, 360, 270, 26, 32);
-    this.configureLabelNode(this.hintLabel, new Vec3(330, 225, 0), HorizontalTextAlignment.LEFT, 340, 300, 24, 30);
-    this.configureLabelNode(this.resultLabel, new Vec3(-470, -220, 0), HorizontalTextAlignment.LEFT, 420, 160, 22, 28);
+    this.configureLabelNode(this.hudLabel, new Vec3(-520, 210, 0), HorizontalTextAlignment.LEFT, 280, 170, 20, 24);
+    this.configureLabelNode(this.hintLabel, new Vec3(390, -230, 0), HorizontalTextAlignment.RIGHT, 360, 170, 22, 28);
+    this.configureLabelNode(this.resultLabel, new Vec3(0, -308, 0), HorizontalTextAlignment.CENTER, 500, 80, 20, 24);
+
+    if (this.hudLabel) {
+      this.hudLabel.color = new Color(222, 236, 247, 210);
+    }
+
+    if (this.hintLabel) {
+      this.hintLabel.color = new Color(232, 241, 248, 215);
+    }
+
+    if (this.resultLabel) {
+      this.resultLabel.color = new Color(255, 243, 211, 235);
+    }
 
     if (this.skierNode) {
       this.skierNode.setPosition(0, PLAYER_Y, 0);
@@ -860,7 +971,7 @@ export class SkiEndlessGameScene extends Component {
     target.enabled = enabled;
     this.drawButtonBackground(
       target.background,
-      enabled ? new Color(45, 103, 214, 255) : new Color(72, 77, 90, 255),
+      enabled ? target.activeColor : target.disabledColor,
       target.width,
       target.height
     );
@@ -983,14 +1094,18 @@ export class SkiEndlessGameScene extends Component {
     text: string,
     position: Vec3,
     id: ButtonActionId,
-    size: { width: number; height: number } = { width: 300, height: 62 }
+    size: { width: number; height: number } = { width: 300, height: 62 },
+    palette: { activeColor: Color; disabledColor: Color } = {
+      activeColor: new Color(45, 103, 214, 255),
+      disabledColor: new Color(72, 77, 90, 255)
+    }
   ): UIButton {
     const node = this.ensureChildNode(parent, name, 12);
     node.setPosition(position);
     const transform = node.getComponent(UITransform) ?? node.addComponent(UITransform);
     transform.setContentSize(size.width, size.height);
     const background = this.ensureGraphics(node);
-    this.drawButtonBackground(background, new Color(45, 103, 214, 255), size.width, size.height);
+    this.drawButtonBackground(background, palette.activeColor, size.width, size.height);
 
     const label = this.ensureLabelNode(node, `${name}Label`, 26);
     this.configureLabelNode(label, new Vec3(0, 0, 0), HorizontalTextAlignment.CENTER, size.width - 20, size.height - 10, 26, 30);
@@ -1003,8 +1118,45 @@ export class SkiEndlessGameScene extends Component {
       label,
       width: size.width,
       height: size.height,
+      activeColor: palette.activeColor,
+      disabledColor: palette.disabledColor,
       enabled: true
     };
+  }
+
+  private createStatCard(parent: Node, name: string, title: string, position: Vec3, color: Color): UIStatCard {
+    const node = this.ensureChildNode(parent, name, 1);
+    node.setPosition(position);
+    const transform = node.getComponent(UITransform) ?? node.addComponent(UITransform);
+    transform.setContentSize(210, 84);
+    const background = this.ensureGraphics(node);
+    this.drawStatCard(background, color);
+
+    const titleLabel = this.ensureLabelNode(node, `${name}Title`, 18);
+    const valueLabel = this.ensureLabelNode(node, `${name}Value`, 28);
+    this.configureLabelNode(titleLabel, new Vec3(0, 18, 0), HorizontalTextAlignment.CENTER, 180, 28, 18, 22);
+    this.configureLabelNode(valueLabel, new Vec3(0, -14, 0), HorizontalTextAlignment.CENTER, 180, 36, 28, 32);
+    titleLabel.color = new Color(226, 239, 250, 220);
+    valueLabel.color = new Color(255, 255, 255, 255);
+    titleLabel.string = title;
+    valueLabel.string = '--';
+
+    return {
+      id: name.startsWith('Distance') ? 'distance' : name.startsWith('Coin') ? 'coins' : 'speed',
+      node,
+      background,
+      titleLabel,
+      valueLabel
+    };
+  }
+
+  private setStatCardValue(id: UIStatCard['id'], value: string): void {
+    const card = this.hudCards.find((item) => item.id === id);
+    if (!card) {
+      return;
+    }
+
+    card.valueLabel.string = value;
   }
 
   private drawButtonBackground(graphics: Graphics, color: Color, width = 300, height = 62): void {
@@ -1012,6 +1164,26 @@ export class SkiEndlessGameScene extends Component {
     graphics.fillColor = color;
     graphics.roundRect(-width / 2, -height / 2, width, height, 18);
     graphics.fill();
+
+    graphics.fillColor = new Color(255, 255, 255, 24);
+    graphics.roundRect(-width / 2, 2, width, height / 2 - 6, 18);
+    graphics.fill();
+  }
+
+  private drawStatCard(graphics: Graphics, color: Color): void {
+    graphics.clear();
+    graphics.fillColor = new Color(15, 24, 39, 175);
+    graphics.roundRect(-105, -42, 210, 84, 22);
+    graphics.fill();
+
+    graphics.fillColor = color;
+    graphics.roundRect(-105, 16, 210, 26, 22);
+    graphics.fill();
+
+    graphics.strokeColor = new Color(255, 255, 255, 34);
+    graphics.lineWidth = 2;
+    graphics.roundRect(-105, -42, 210, 84, 22);
+    graphics.stroke();
   }
 
   private drawPanelBackground(graphics: Graphics, x: number, y: number, width: number, height: number, color: Color): void {
@@ -1042,6 +1214,84 @@ export class SkiEndlessGameScene extends Component {
     graphics.moveTo(direction * 80, 320);
     graphics.lineTo(direction * 150, -350);
     graphics.stroke();
+  }
+
+  private drawMountainRange(
+    node: Node,
+    baseY: number,
+    heightOffset: number,
+    color: Color,
+    points: Array<[number, number]>
+  ): void {
+    const graphics = this.ensureGraphics(node);
+    graphics.clear();
+    graphics.fillColor = color;
+    graphics.moveTo(points[0]?.[0] ?? -640, baseY - heightOffset);
+    points.forEach(([x, y]) => {
+      graphics.lineTo(x, baseY + y - heightOffset);
+    });
+    graphics.lineTo(points[points.length - 1]?.[0] ?? 640, baseY - heightOffset);
+    graphics.lineTo(points[0]?.[0] ?? -640, baseY - heightOffset);
+    graphics.close();
+    graphics.fill();
+  }
+
+  private buildSideDecorations(): void {
+    if (!this.backgroundRoot) {
+      return;
+    }
+
+    for (let index = 0; index < 5; index += 1) {
+      const leftTree = this.createGraphicsNode(`DecorTreeLeft-${index}`, this.backgroundRoot, 4);
+      const rightTree = this.createGraphicsNode(`DecorTreeRight-${index}`, this.backgroundRoot, 4);
+      const y = 250 - index * 125;
+      const scale = 0.8 + index * 0.08;
+
+      this.drawObstacle(this.ensureGraphics(leftTree), 'tree');
+      this.drawObstacle(this.ensureGraphics(rightTree), 'tree');
+      leftTree.setPosition(-500 + index * 14, y, 0);
+      rightTree.setPosition(500 - index * 16, y + 25, 0);
+      leftTree.setScale(scale, scale, 1);
+      rightTree.setScale(scale * 0.95, scale * 0.95, 1);
+    }
+
+    const snowDriftLeft = this.createGraphicsNode('SnowDriftLeft', this.backgroundRoot, 5);
+    const snowDriftRight = this.createGraphicsNode('SnowDriftRight', this.backgroundRoot, 5);
+    this.drawSnowDrift(snowDriftLeft, -530);
+    this.drawSnowDrift(snowDriftRight, 530);
+  }
+
+  private buildAmbientSnow(): void {
+    if (!this.backgroundRoot) {
+      return;
+    }
+
+    for (let index = 0; index < 22; index += 1) {
+      const node = this.createGraphicsNode(`SnowParticle-${index}`, this.backgroundRoot, 6);
+      const graphics = this.ensureGraphics(node);
+      const radius = 2 + (index % 4);
+      graphics.clear();
+      graphics.fillColor = new Color(255, 255, 255, 120 + (index % 3) * 30);
+      graphics.circle(0, 0, radius);
+      graphics.fill();
+
+      this.snowParticles.push({
+        node,
+        x: -560 + Math.random() * 1120,
+        y: -320 + Math.random() * 760,
+        speed: 26 + Math.random() * 38
+      });
+    }
+  }
+
+  private drawSnowDrift(node: Node, centerX: number): void {
+    const graphics = this.ensureGraphics(node);
+    graphics.clear();
+    graphics.fillColor = new Color(250, 252, 255, 170);
+    graphics.circle(centerX, -260, 120);
+    graphics.fill();
+    graphics.circle(centerX + (centerX < 0 ? 55 : -55), -220, 84);
+    graphics.fill();
   }
 
   private drawSkier(graphics: Graphics): void {
