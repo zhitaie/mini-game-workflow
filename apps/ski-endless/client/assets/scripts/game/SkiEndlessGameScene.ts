@@ -24,6 +24,7 @@ import {
   type SkiNoticeItem,
   type SkiRunSummary
 } from './SkiEndlessPrototypeController';
+import { SkiAudioDirector } from './SkiAudioDirector';
 
 const { ccclass, property } = _decorator;
 
@@ -44,19 +45,20 @@ type ButtonActionId =
   | 'close_rank'
   | 'close_notice'
   | 'close_settings'
+  | 'toggle_audio'
   | 'toggle_snow_fx'
   | 'toggle_assist'
   | 'toggle_coach';
 
-const PLAYER_Y = -235;
-const SPAWN_Y = 470;
-const DESPAWN_Y = -420;
-const LANE_BASE_X = 185;
-const TRACK_HALF_WIDTH_TOP = 230;
-const TRACK_HALF_WIDTH_BOTTOM = 440;
+const PLAYER_Y = -420;
+const SPAWN_Y = 720;
+const DESPAWN_Y = -760;
+const LANE_BASE_X = 118;
+const TRACK_HALF_WIDTH_TOP = 150;
+const TRACK_HALF_WIDTH_BOTTOM = 320;
 const DISTANCE_FACTOR = 12;
 const ENTITY_MOVE_FACTOR = 104;
-const STRIPE_MOVE_FACTOR = 72;
+const STRIPE_MOVE_FACTOR = 88;
 const MIN_SPAWN_INTERVAL = 0.52;
 const PREFERENCES_STORAGE_KEY = 'ski-endless-local-preferences-v1';
 
@@ -130,6 +132,7 @@ interface UIStatCard {
 }
 
 interface SkiLocalPreferences {
+  audioEnabled: boolean;
   snowFxEnabled: boolean;
   assistLinesEnabled: boolean;
   coachTipsEnabled: boolean;
@@ -194,10 +197,12 @@ export class SkiEndlessGameScene extends Component {
   private resultCards: UIStatCard[] = [];
   private laneGuideNodes: Node[] = [];
   private preferences: SkiLocalPreferences = {
+    audioEnabled: true,
     snowFxEnabled: true,
     assistLinesEnabled: true,
     coachTipsEnabled: true
   };
+  private readonly audioDirector = new SkiAudioDirector();
 
   start(): void {
     const runtimeSession = SkiRuntimeSessionStore.get();
@@ -211,6 +216,7 @@ export class SkiEndlessGameScene extends Component {
     this.controller = new SkiEndlessPrototypeController(runtimeSession.runtime);
     this.savedCoinBank = this.controller.getSnapshot().coins;
     this.loadPreferences();
+    this.audioDirector.setAudioEnabled(this.preferences.audioEnabled);
     this.ensureSceneNodes();
     this.applyDefaultLayout();
     this.buildTrackVisuals();
@@ -225,6 +231,7 @@ export class SkiEndlessGameScene extends Component {
   onDestroy(): void {
     input.off(Input.EventType.KEY_DOWN, this.onKeyDown, this);
     input.off(Input.EventType.TOUCH_START, this.onTouchStart, this);
+    this.audioDirector.dispose();
   }
 
   update(deltaTime: number): void {
@@ -409,52 +416,52 @@ export class SkiEndlessGameScene extends Component {
     this.laneGuideNodes = [];
 
     const skyNode = this.createGraphicsNode('Sky', this.backgroundRoot, -5);
-    this.drawRect(skyNode, 0, 150, 1280, 620, new Color(122, 181, 235, 255));
+    this.drawRect(skyNode, 0, 150, 840, 1480, new Color(122, 181, 235, 255));
 
     const upperSkyNode = this.createGraphicsNode('UpperSky', this.backgroundRoot, -4);
-    this.drawRect(upperSkyNode, 0, 285, 1280, 250, new Color(75, 137, 212, 255));
+    this.drawRect(upperSkyNode, 0, 410, 840, 460, new Color(75, 137, 212, 255));
 
     const sunNode = this.createGraphicsNode('Sun', this.backgroundRoot, -3);
     const sunGraphics = this.ensureGraphics(sunNode);
     sunGraphics.clear();
     sunGraphics.fillColor = new Color(255, 238, 178, 255);
-    sunGraphics.circle(390, 210, 56);
+    sunGraphics.circle(238, 350, 56);
     sunGraphics.fill();
 
     const mountainFar = this.createGraphicsNode('MountainFar', this.backgroundRoot, -2);
-    this.drawMountainRange(mountainFar, 118, 240, new Color(180, 204, 228, 255), [
-      [-650, 20],
-      [-500, 140],
-      [-360, 50],
-      [-180, 190],
-      [20, 70],
-      [180, 170],
-      [360, 55],
-      [520, 155],
-      [650, 30]
+    this.drawMountainRange(mountainFar, 220, 260, new Color(180, 204, 228, 255), [
+      [-420, 10],
+      [-320, 170],
+      [-250, 70],
+      [-120, 230],
+      [0, 95],
+      [120, 215],
+      [260, 80],
+      [340, 188],
+      [420, 24]
     ]);
 
     const mountainNear = this.createGraphicsNode('MountainNear', this.backgroundRoot, -1);
-    this.drawMountainRange(mountainNear, 72, 220, new Color(214, 230, 245, 255), [
-      [-650, 0],
-      [-520, 110],
-      [-360, 40],
-      [-240, 135],
-      [-60, 30],
-      [120, 120],
-      [280, 28],
-      [420, 132],
-      [650, 10]
+    this.drawMountainRange(mountainNear, 170, 210, new Color(214, 230, 245, 255), [
+      [-420, 0],
+      [-330, 112],
+      [-230, 42],
+      [-80, 138],
+      [40, 36],
+      [170, 122],
+      [280, 24],
+      [360, 118],
+      [420, 8]
     ]);
 
     const trackNode = this.createGraphicsNode('Track', this.backgroundRoot, 0);
     const trackGraphics = this.ensureGraphics(trackNode);
     trackGraphics.clear();
     trackGraphics.fillColor = new Color(238, 245, 250, 255);
-    trackGraphics.moveTo(-TRACK_HALF_WIDTH_TOP, 340);
-    trackGraphics.lineTo(TRACK_HALF_WIDTH_TOP, 340);
-    trackGraphics.lineTo(TRACK_HALF_WIDTH_BOTTOM, -360);
-    trackGraphics.lineTo(-TRACK_HALF_WIDTH_BOTTOM, -360);
+    trackGraphics.moveTo(-TRACK_HALF_WIDTH_TOP, 260);
+    trackGraphics.lineTo(TRACK_HALF_WIDTH_TOP, 260);
+    trackGraphics.lineTo(TRACK_HALF_WIDTH_BOTTOM, -640);
+    trackGraphics.lineTo(-TRACK_HALF_WIDTH_BOTTOM, -640);
     trackGraphics.close();
     trackGraphics.fill();
 
@@ -463,22 +470,22 @@ export class SkiEndlessGameScene extends Component {
     edge.clear();
     edge.strokeColor = new Color(208, 222, 232, 255);
     edge.lineWidth = 6;
-    edge.moveTo(-TRACK_HALF_WIDTH_TOP, 340);
-    edge.lineTo(-TRACK_HALF_WIDTH_BOTTOM, -360);
-    edge.moveTo(TRACK_HALF_WIDTH_TOP, 340);
-    edge.lineTo(TRACK_HALF_WIDTH_BOTTOM, -360);
+    edge.moveTo(-TRACK_HALF_WIDTH_TOP, 260);
+    edge.lineTo(-TRACK_HALF_WIDTH_BOTTOM, -640);
+    edge.moveTo(TRACK_HALF_WIDTH_TOP, 260);
+    edge.lineTo(TRACK_HALF_WIDTH_BOTTOM, -640);
     edge.stroke();
 
-    for (let index = 0; index < 3; index += 1) {
+    for (let index = 0; index < 4; index += 1) {
       const stripeNode = this.createGraphicsNode(`Stripe-${index}`, this.backgroundRoot, 2);
       const graphic = this.ensureGraphics(stripeNode);
       graphic.clear();
       graphic.fillColor = new Color(255, 255, 255, 92);
-      graphic.roundRect(-70, -10, 140, 20, 10);
+      graphic.roundRect(-42, -18, 84, 36, 18);
       graphic.fill();
       this.stripes.push({
         node: stripeNode,
-        y: 260 - index * 220
+        y: 200 - index * 220
       });
     }
 
@@ -516,16 +523,16 @@ export class SkiEndlessGameScene extends Component {
 
     this.hudPanelRoot.removeAllChildren();
     const homeBackground = this.ensureGraphics(this.homePanel);
-    this.drawPanelBackground(homeBackground, 0, 32, 650, 540, new Color(11, 23, 39, 232));
+    this.drawPanelBackground(homeBackground, 0, 26, 620, 860, new Color(11, 23, 39, 232));
     const rankBackground = this.ensureGraphics(this.rankPanel);
-    this.drawPanelBackground(rankBackground, 0, 28, 650, 540, new Color(11, 23, 39, 236));
+    this.drawPanelBackground(rankBackground, 0, 26, 620, 900, new Color(11, 23, 39, 236));
     const noticeBackground = this.ensureGraphics(this.noticePanel);
-    this.drawPanelBackground(noticeBackground, 0, 28, 650, 540, new Color(11, 23, 39, 236));
+    this.drawPanelBackground(noticeBackground, 0, 26, 620, 900, new Color(11, 23, 39, 236));
     const settingsBackground = this.ensureGraphics(this.settingsPanel);
-    this.drawPanelBackground(settingsBackground, 0, 28, 650, 540, new Color(11, 23, 39, 236));
+    this.drawPanelBackground(settingsBackground, 0, 26, 620, 900, new Color(11, 23, 39, 236));
 
     const resultBackground = this.ensureGraphics(this.resultPanel);
-    this.drawPanelBackground(resultBackground, 0, -6, 650, 438, new Color(14, 22, 36, 234));
+    this.drawPanelBackground(resultBackground, 0, -18, 620, 640, new Color(14, 22, 36, 234));
 
     this.homeTitleLabel = this.ensureLabelNode(this.homePanel, 'HomeTitle', 52);
     this.homeBadgeLabel = this.ensureLabelNode(this.homePanel, 'HomeBadge', 20);
@@ -540,106 +547,110 @@ export class SkiEndlessGameScene extends Component {
     this.resultTitleLabel = this.ensureLabelNode(this.resultPanel, 'ResultTitle', 44);
     this.resultInfoLabel = this.ensureLabelNode(this.resultPanel, 'ResultInfo', 26);
 
-    this.configureLabelNode(this.homeTitleLabel, new Vec3(0, 178, 0), HorizontalTextAlignment.CENTER, 520, 80, 56, 62);
-    this.configureLabelNode(this.homeBadgeLabel, new Vec3(0, 120, 0), HorizontalTextAlignment.CENTER, 430, 46, 20, 24);
-    this.configureLabelNode(this.homeInfoLabel, new Vec3(0, -72, 0), HorizontalTextAlignment.CENTER, 560, 110, 24, 32);
-    this.configureLabelNode(this.homeToastLabel, new Vec3(0, -206, 0), HorizontalTextAlignment.CENTER, 560, 60, 22, 28);
-    this.configureLabelNode(this.rankTitleLabel, new Vec3(0, 186, 0), HorizontalTextAlignment.CENTER, 540, 70, 44, 50);
-    this.configureLabelNode(this.rankInfoLabel, new Vec3(0, 4, 0), HorizontalTextAlignment.LEFT, 560, 330, 24, 30);
-    this.configureLabelNode(this.noticeTitleLabel, new Vec3(0, 186, 0), HorizontalTextAlignment.CENTER, 540, 70, 44, 50);
-    this.configureLabelNode(this.noticeInfoLabel, new Vec3(0, 4, 0), HorizontalTextAlignment.LEFT, 560, 330, 24, 30);
-    this.configureLabelNode(this.settingsTitleLabel, new Vec3(0, 186, 0), HorizontalTextAlignment.CENTER, 540, 70, 44, 50);
-    this.configureLabelNode(this.settingsInfoLabel, new Vec3(0, 44, 0), HorizontalTextAlignment.LEFT, 560, 180, 24, 30);
-    this.configureLabelNode(this.resultTitleLabel, new Vec3(0, 140, 0), HorizontalTextAlignment.CENTER, 520, 70, 46, 52);
-    this.configureLabelNode(this.resultInfoLabel, new Vec3(0, -16, 0), HorizontalTextAlignment.CENTER, 560, 150, 24, 30);
+    this.configureLabelNode(this.homeTitleLabel, new Vec3(0, 298, 0), HorizontalTextAlignment.CENTER, 520, 80, 56, 62);
+    this.configureLabelNode(this.homeBadgeLabel, new Vec3(0, 244, 0), HorizontalTextAlignment.CENTER, 430, 46, 20, 24);
+    this.configureLabelNode(this.homeInfoLabel, new Vec3(0, 8, 0), HorizontalTextAlignment.CENTER, 560, 110, 24, 32);
+    this.configureLabelNode(this.homeToastLabel, new Vec3(0, -240, 0), HorizontalTextAlignment.CENTER, 560, 72, 22, 28);
+    this.configureLabelNode(this.rankTitleLabel, new Vec3(0, 318, 0), HorizontalTextAlignment.CENTER, 540, 70, 44, 50);
+    this.configureLabelNode(this.rankInfoLabel, new Vec3(0, 18, 0), HorizontalTextAlignment.LEFT, 540, 520, 24, 30);
+    this.configureLabelNode(this.noticeTitleLabel, new Vec3(0, 318, 0), HorizontalTextAlignment.CENTER, 540, 70, 44, 50);
+    this.configureLabelNode(this.noticeInfoLabel, new Vec3(0, 18, 0), HorizontalTextAlignment.LEFT, 540, 520, 24, 30);
+    this.configureLabelNode(this.settingsTitleLabel, new Vec3(0, 318, 0), HorizontalTextAlignment.CENTER, 540, 70, 44, 50);
+    this.configureLabelNode(this.settingsInfoLabel, new Vec3(0, 162, 0), HorizontalTextAlignment.LEFT, 540, 180, 24, 30);
+    this.configureLabelNode(this.resultTitleLabel, new Vec3(0, 196, 0), HorizontalTextAlignment.CENTER, 520, 70, 46, 52);
+    this.configureLabelNode(this.resultInfoLabel, new Vec3(0, 40, 0), HorizontalTextAlignment.CENTER, 560, 150, 24, 30);
 
     this.homeButtons = [
-      this.createButton(this.homePanel, 'StartButton', 'Start Run', new Vec3(0, -122, 0), 'start_run', { width: 320, height: 66 }, {
+      this.createButton(this.homePanel, 'StartButton', 'Start Run', new Vec3(0, -348, 0), 'start_run', { width: 320, height: 66 }, {
         activeColor: new Color(20, 152, 108, 255),
         disabledColor: new Color(77, 92, 92, 255)
       }),
-      this.createButton(this.homePanel, 'RankButton', 'Leaderboard', new Vec3(-220, -184, 0), 'view_rank', { width: 180, height: 56 }, {
+      this.createButton(this.homePanel, 'RankButton', 'Leaderboard', new Vec3(0, -426, 0), 'view_rank', { width: 320, height: 56 }, {
         activeColor: new Color(43, 87, 162, 255),
         disabledColor: new Color(77, 84, 97, 255)
       }),
-      this.createButton(this.homePanel, 'NoticeButton', 'Notice', new Vec3(0, -184, 0), 'view_notice', { width: 180, height: 56 }, {
+      this.createButton(this.homePanel, 'NoticeButton', 'Notice', new Vec3(0, -494, 0), 'view_notice', { width: 320, height: 56 }, {
         activeColor: new Color(54, 99, 173, 255),
         disabledColor: new Color(77, 84, 97, 255)
       }),
-      this.createButton(this.homePanel, 'SettingsButton', 'Settings', new Vec3(220, -184, 0), 'view_settings', { width: 180, height: 56 }, {
+      this.createButton(this.homePanel, 'SettingsButton', 'Settings', new Vec3(0, -562, 0), 'view_settings', { width: 320, height: 56 }, {
         activeColor: new Color(83, 96, 122, 255),
         disabledColor: new Color(77, 84, 97, 255)
       })
     ];
 
     this.rankButtons = [
-      this.createButton(this.rankPanel, 'RankBackButton', 'Back Home', new Vec3(0, -186, 0), 'close_rank', { width: 240, height: 58 }, {
+      this.createButton(this.rankPanel, 'RankBackButton', 'Back Home', new Vec3(0, -366, 0), 'close_rank', { width: 260, height: 58 }, {
         activeColor: new Color(87, 95, 120, 255),
         disabledColor: new Color(77, 84, 97, 255)
       })
     ];
 
     this.noticeButtons = [
-      this.createButton(this.noticePanel, 'NoticeBackButton', 'Back Home', new Vec3(0, -186, 0), 'close_notice', { width: 240, height: 58 }, {
+      this.createButton(this.noticePanel, 'NoticeBackButton', 'Back Home', new Vec3(0, -366, 0), 'close_notice', { width: 260, height: 58 }, {
         activeColor: new Color(87, 95, 120, 255),
         disabledColor: new Color(77, 84, 97, 255)
       })
     ];
 
     this.settingsButtons = [
-      this.createButton(this.settingsPanel, 'SnowFxButton', 'Snow FX: On', new Vec3(0, -44, 0), 'toggle_snow_fx', { width: 320, height: 58 }, {
+      this.createButton(this.settingsPanel, 'AudioButton', 'Audio: On', new Vec3(0, 84, 0), 'toggle_audio', { width: 320, height: 58 }, {
+        activeColor: new Color(84, 93, 210, 255),
+        disabledColor: new Color(77, 84, 97, 255)
+      }),
+      this.createButton(this.settingsPanel, 'SnowFxButton', 'Snow FX: On', new Vec3(0, 8, 0), 'toggle_snow_fx', { width: 320, height: 58 }, {
         activeColor: new Color(52, 116, 215, 255),
         disabledColor: new Color(77, 84, 97, 255)
       }),
-      this.createButton(this.settingsPanel, 'AssistButton', 'Assist Lines: On', new Vec3(0, -116, 0), 'toggle_assist', { width: 320, height: 58 }, {
+      this.createButton(this.settingsPanel, 'AssistButton', 'Assist Lines: On', new Vec3(0, -68, 0), 'toggle_assist', { width: 320, height: 58 }, {
         activeColor: new Color(36, 152, 126, 255),
         disabledColor: new Color(77, 84, 97, 255)
       }),
-      this.createButton(this.settingsPanel, 'CoachButton', 'Coach Tips: On', new Vec3(0, -188, 0), 'toggle_coach', { width: 320, height: 58 }, {
+      this.createButton(this.settingsPanel, 'CoachButton', 'Coach Tips: On', new Vec3(0, -144, 0), 'toggle_coach', { width: 320, height: 58 }, {
         activeColor: new Color(221, 162, 37, 255),
         disabledColor: new Color(77, 84, 97, 255)
       }),
-      this.createButton(this.settingsPanel, 'SettingsBackButton', 'Back Home', new Vec3(0, -266, 0), 'close_settings', { width: 240, height: 58 }, {
+      this.createButton(this.settingsPanel, 'SettingsBackButton', 'Back Home', new Vec3(0, -278, 0), 'close_settings', { width: 260, height: 58 }, {
         activeColor: new Color(87, 95, 120, 255),
         disabledColor: new Color(77, 84, 97, 255)
       })
     ];
 
     this.resultButtons = [
-      this.createButton(this.resultPanel, 'ReviveButton', 'Revive', new Vec3(-155, -102, 0), 'revive', { width: 220, height: 58 }, {
+      this.createButton(this.resultPanel, 'ReviveButton', 'Revive', new Vec3(0, -112, 0), 'revive', { width: 320, height: 58 }, {
         activeColor: new Color(245, 154, 33, 255),
         disabledColor: new Color(97, 89, 72, 255)
       }),
-      this.createButton(this.resultPanel, 'DoubleButton', 'Double Coins', new Vec3(155, -102, 0), 'double_coin', { width: 220, height: 58 }, {
+      this.createButton(this.resultPanel, 'DoubleButton', 'Double Coins', new Vec3(0, -184, 0), 'double_coin', { width: 320, height: 58 }, {
         activeColor: new Color(47, 113, 224, 255),
         disabledColor: new Color(77, 84, 97, 255)
       }),
-      this.createButton(this.resultPanel, 'RestartButton', 'Restart', new Vec3(-155, -174, 0), 'restart', { width: 220, height: 58 }, {
+      this.createButton(this.resultPanel, 'RestartButton', 'Restart', new Vec3(0, -256, 0), 'restart', { width: 320, height: 58 }, {
         activeColor: new Color(31, 163, 134, 255),
         disabledColor: new Color(77, 84, 97, 255)
       }),
-      this.createButton(this.resultPanel, 'HomeButton', 'Back Home', new Vec3(155, -174, 0), 'back_home', { width: 220, height: 58 }, {
+      this.createButton(this.resultPanel, 'HomeButton', 'Back Home', new Vec3(0, -328, 0), 'back_home', { width: 320, height: 58 }, {
         activeColor: new Color(87, 95, 120, 255),
         disabledColor: new Color(77, 84, 97, 255)
       })
     ];
 
     this.hudCards = [
-      this.createStatCard(this.hudPanelRoot, 'DistanceCard', 'Distance', new Vec3(-245, 292, 0), new Color(52, 116, 215, 230), { width: 210, height: 84 }, 'distance'),
-      this.createStatCard(this.hudPanelRoot, 'CoinCard', 'Coins', new Vec3(0, 292, 0), new Color(221, 162, 37, 230), { width: 210, height: 84 }, 'coins'),
-      this.createStatCard(this.hudPanelRoot, 'SpeedCard', 'Speed', new Vec3(245, 292, 0), new Color(36, 152, 126, 230), { width: 210, height: 84 }, 'speed')
+      this.createStatCard(this.hudPanelRoot, 'DistanceCard', 'Distance', new Vec3(-160, 568, 0), new Color(52, 116, 215, 230), { width: 146, height: 74 }, 'distance'),
+      this.createStatCard(this.hudPanelRoot, 'CoinCard', 'Coins', new Vec3(0, 568, 0), new Color(221, 162, 37, 230), { width: 146, height: 74 }, 'coins'),
+      this.createStatCard(this.hudPanelRoot, 'SpeedCard', 'Speed', new Vec3(160, 568, 0), new Color(36, 152, 126, 230), { width: 146, height: 74 }, 'speed')
     ];
 
     this.homeCards = [
-      this.createStatCard(this.homePanel, 'HomeBestDistanceCard', 'Best Distance', new Vec3(-190, 26, 0), new Color(52, 116, 215, 230), { width: 180, height: 82 }),
-      this.createStatCard(this.homePanel, 'HomeCoinBankCard', 'Coin Bank', new Vec3(0, 26, 0), new Color(221, 162, 37, 230), { width: 180, height: 82 }),
-      this.createStatCard(this.homePanel, 'HomeBestScoreCard', 'Best Score', new Vec3(190, 26, 0), new Color(36, 152, 126, 230), { width: 180, height: 82 })
+      this.createStatCard(this.homePanel, 'HomeBestDistanceCard', 'Best Distance', new Vec3(0, 140, 0), new Color(52, 116, 215, 230), { width: 220, height: 88 }),
+      this.createStatCard(this.homePanel, 'HomeCoinBankCard', 'Coin Bank', new Vec3(0, 40, 0), new Color(221, 162, 37, 230), { width: 220, height: 88 }),
+      this.createStatCard(this.homePanel, 'HomeBestScoreCard', 'Best Score', new Vec3(0, -60, 0), new Color(36, 152, 126, 230), { width: 220, height: 88 })
     ];
 
     this.resultCards = [
-      this.createStatCard(this.resultPanel, 'ResultDistanceCard', 'Distance', new Vec3(-190, 58, 0), new Color(52, 116, 215, 230), { width: 180, height: 82 }),
-      this.createStatCard(this.resultPanel, 'ResultCoinCard', 'Run Coins', new Vec3(0, 58, 0), new Color(221, 162, 37, 230), { width: 180, height: 82 }),
-      this.createStatCard(this.resultPanel, 'ResultBestCard', 'Best', new Vec3(190, 58, 0), new Color(36, 152, 126, 230), { width: 180, height: 82 })
+      this.createStatCard(this.resultPanel, 'ResultDistanceCard', 'Distance', new Vec3(0, 112, 0), new Color(52, 116, 215, 230), { width: 220, height: 88 }),
+      this.createStatCard(this.resultPanel, 'ResultCoinCard', 'Run Coins', new Vec3(0, 8, 0), new Color(221, 162, 37, 230), { width: 220, height: 88 }),
+      this.createStatCard(this.resultPanel, 'ResultBestCard', 'Best', new Vec3(0, -96, 0), new Color(36, 152, 126, 230), { width: 220, height: 88 })
     ];
   }
 
@@ -699,6 +710,7 @@ export class SkiEndlessGameScene extends Component {
           : 'to snap between lanes fast.'
       ].join('\n'));
     this.resultLabel && (this.resultLabel.string = '');
+    this.audioDirector.setBgmMode('home');
   }
 
   private startNewRun(): void {
@@ -738,6 +750,8 @@ export class SkiEndlessGameScene extends Component {
     this.renderHint();
     this.updateSkierVisual(0);
     this.renderHud();
+    this.audioDirector.playRestart();
+    this.audioDirector.setBgmMode('run');
   }
 
   private async showRankScreen(): Promise<void> {
@@ -766,6 +780,7 @@ export class SkiEndlessGameScene extends Component {
 
     this.resultLabel && (this.resultLabel.string = '');
     this.renderHint();
+    this.audioDirector.playButton();
 
     try {
       const leaderboard = await this.controller.getLeaderboard(8);
@@ -810,6 +825,7 @@ export class SkiEndlessGameScene extends Component {
 
     this.resultLabel && (this.resultLabel.string = '');
     this.renderHint();
+    this.audioDirector.playButton();
 
     try {
       const noticeList = await this.controller.getNotices();
@@ -847,6 +863,7 @@ export class SkiEndlessGameScene extends Component {
     this.renderSettingsInfo();
     this.resultLabel && (this.resultLabel.string = '');
     this.renderHint();
+    this.audioDirector.playButton();
   }
 
   private shiftLane(delta: -1 | 1): void {
@@ -1005,6 +1022,7 @@ export class SkiEndlessGameScene extends Component {
             this.runState.coinsCollected += 1;
             entity.node.destroy();
             this.resultLabel && (this.resultLabel.string = `Coin collected\nrunCoins=${String(this.runState.coinsCollected)}`);
+            this.audioDirector.playCoin();
             continue;
           }
 
@@ -1045,6 +1063,8 @@ export class SkiEndlessGameScene extends Component {
         this.resultTitleLabel.string = 'Run Finished';
       }
 
+      this.audioDirector.playCrash();
+      this.audioDirector.setBgmMode('result');
       this.renderResultInfo(crashedBy);
       this.updateResultButtons();
       this.renderHud();
@@ -1081,6 +1101,8 @@ export class SkiEndlessGameScene extends Component {
       this.resultLabel && (this.resultLabel.string = `Revived\nverification=${verification.verificationId}`);
       this.hudPanelRoot && (this.hudPanelRoot.active = true);
       this.skierNode && (this.skierNode.active = true);
+      this.audioDirector.playRevive();
+      this.audioDirector.setBgmMode('run');
       this.renderHud();
       this.renderHint();
     } finally {
@@ -1098,6 +1120,7 @@ export class SkiEndlessGameScene extends Component {
       const reward = await this.controller.claimDoubleCoinReward(this.lastSummary.coinsCollected);
       this.runState.doubleClaimed = true;
       this.savedCoinBank = reward.balanceAfter;
+      this.audioDirector.playReward();
       this.renderResultInfo('reward_ad');
       this.resultInfoLabel &&
         (this.resultInfoLabel.string = [
@@ -1204,6 +1227,7 @@ export class SkiEndlessGameScene extends Component {
 
     if (this.phase === 'settings') {
       this.hintLabel.string = [
+        'Audio controls all local music and SFX.',
         'Snow FX controls ambient particles.',
         'Assist Lines show lane guides on the slope.',
         '',
@@ -1259,6 +1283,7 @@ export class SkiEndlessGameScene extends Component {
     this.settingsInfoLabel.string = [
       'Local slope presentation',
       '',
+      `Audio          ${this.preferences.audioEnabled ? 'Enabled' : 'Disabled'}`,
       `Snow FX        ${this.preferences.snowFxEnabled ? 'Enabled' : 'Disabled'}`,
       `Assist Lines   ${this.preferences.assistLinesEnabled ? 'Enabled' : 'Disabled'}`,
       `Coach Tips     ${this.preferences.coachTipsEnabled ? 'Enabled' : 'Disabled'}`,
@@ -1281,9 +1306,9 @@ export class SkiEndlessGameScene extends Component {
   }
 
   private applyDefaultLayout(): void {
-    this.configureLabelNode(this.hudLabel, new Vec3(-520, 210, 0), HorizontalTextAlignment.LEFT, 280, 170, 20, 24);
-    this.configureLabelNode(this.hintLabel, new Vec3(390, -230, 0), HorizontalTextAlignment.RIGHT, 360, 170, 22, 28);
-    this.configureLabelNode(this.resultLabel, new Vec3(0, -308, 0), HorizontalTextAlignment.CENTER, 500, 80, 20, 24);
+    this.configureLabelNode(this.hudLabel, new Vec3(-280, 458, 0), HorizontalTextAlignment.LEFT, 220, 140, 18, 22);
+    this.configureLabelNode(this.hintLabel, new Vec3(0, -548, 0), HorizontalTextAlignment.CENTER, 560, 130, 20, 26);
+    this.configureLabelNode(this.resultLabel, new Vec3(0, -474, 0), HorizontalTextAlignment.CENTER, 500, 90, 20, 24);
 
     if (this.hudLabel) {
       this.hudLabel.color = new Color(222, 236, 247, 210);
@@ -1345,53 +1370,77 @@ export class SkiEndlessGameScene extends Component {
   private handleButtonAction(action: ButtonActionId): void {
     switch (action) {
       case 'start_run':
+        this.audioDirector.playButton();
         this.startNewRun();
         break;
       case 'view_rank':
+        this.audioDirector.playButton();
         void this.showRankScreen();
         break;
       case 'view_notice':
+        this.audioDirector.playButton();
         void this.showNoticeScreen();
         break;
       case 'view_settings':
+        this.audioDirector.playButton();
         this.showSettingsScreen();
         break;
       case 'revive':
+        this.audioDirector.playButton();
         void this.reviveRun();
         break;
       case 'double_coin':
+        this.audioDirector.playButton();
         void this.claimDoubleCoins();
         break;
       case 'restart':
+        this.audioDirector.playButton();
         this.startNewRun();
         break;
       case 'back_home':
+        this.audioDirector.playButton();
         this.showHomeScreen();
         break;
       case 'close_rank':
+        this.audioDirector.playButton();
         this.showHomeScreen();
         break;
       case 'close_notice':
+        this.audioDirector.playButton();
         this.showHomeScreen();
         break;
       case 'close_settings':
+        this.audioDirector.playButton();
         this.showHomeScreen();
+        break;
+      case 'toggle_audio':
+        this.preferences.audioEnabled = !this.preferences.audioEnabled;
+        this.persistPreferences();
+        this.audioDirector.setAudioEnabled(this.preferences.audioEnabled);
+        if (this.preferences.audioEnabled) {
+          this.audioDirector.playButton();
+          this.audioDirector.setBgmMode(this.phase === 'running' ? 'run' : this.phase === 'result' ? 'result' : 'home');
+        }
+        this.renderSettingsInfo();
         break;
       case 'toggle_snow_fx':
         this.preferences.snowFxEnabled = !this.preferences.snowFxEnabled;
         this.persistPreferences();
         this.applyPreferenceVisuals();
+        this.audioDirector.playButton();
         this.renderSettingsInfo();
         break;
       case 'toggle_assist':
         this.preferences.assistLinesEnabled = !this.preferences.assistLinesEnabled;
         this.persistPreferences();
         this.applyPreferenceVisuals();
+        this.audioDirector.playButton();
         this.renderSettingsInfo();
         break;
       case 'toggle_coach':
         this.preferences.coachTipsEnabled = !this.preferences.coachTipsEnabled;
         this.persistPreferences();
+        this.audioDirector.playButton();
         this.renderSettingsInfo();
         this.renderHint();
         break;
@@ -1409,6 +1458,7 @@ export class SkiEndlessGameScene extends Component {
       button.label.string = text;
     };
 
+    setText('toggle_audio', `Audio: ${this.preferences.audioEnabled ? 'On' : 'Off'}`);
     setText('toggle_snow_fx', `Snow FX: ${this.preferences.snowFxEnabled ? 'On' : 'Off'}`);
     setText('toggle_assist', `Assist Lines: ${this.preferences.assistLinesEnabled ? 'On' : 'Off'}`);
     setText('toggle_coach', `Coach Tips: ${this.preferences.coachTipsEnabled ? 'On' : 'Off'}`);
@@ -1754,8 +1804,8 @@ export class SkiEndlessGameScene extends Component {
     graphics.clear();
     graphics.strokeColor = new Color(255, 255, 255, 55);
     graphics.lineWidth = 4;
-    graphics.moveTo(direction * 80, 320);
-    graphics.lineTo(direction * 150, -350);
+    graphics.moveTo(direction * 42, 250);
+    graphics.lineTo(direction * 134, -640);
     graphics.stroke();
   }
 
@@ -1784,24 +1834,24 @@ export class SkiEndlessGameScene extends Component {
       return;
     }
 
-    for (let index = 0; index < 5; index += 1) {
+    for (let index = 0; index < 6; index += 1) {
       const leftTree = this.createGraphicsNode(`DecorTreeLeft-${index}`, this.backgroundRoot, 4);
       const rightTree = this.createGraphicsNode(`DecorTreeRight-${index}`, this.backgroundRoot, 4);
-      const y = 250 - index * 125;
+      const y = 270 - index * 166;
       const scale = 0.8 + index * 0.08;
 
       this.drawObstacle(this.ensureGraphics(leftTree), 'tree');
       this.drawObstacle(this.ensureGraphics(rightTree), 'tree');
-      leftTree.setPosition(-500 + index * 14, y, 0);
-      rightTree.setPosition(500 - index * 16, y + 25, 0);
+      leftTree.setPosition(-355 + index * 10, y, 0);
+      rightTree.setPosition(355 - index * 10, y + 40, 0);
       leftTree.setScale(scale, scale, 1);
       rightTree.setScale(scale * 0.95, scale * 0.95, 1);
     }
 
     const snowDriftLeft = this.createGraphicsNode('SnowDriftLeft', this.backgroundRoot, 5);
     const snowDriftRight = this.createGraphicsNode('SnowDriftRight', this.backgroundRoot, 5);
-    this.drawSnowDrift(snowDriftLeft, -530);
-    this.drawSnowDrift(snowDriftRight, 530);
+    this.drawSnowDrift(snowDriftLeft, -360);
+    this.drawSnowDrift(snowDriftRight, 360);
   }
 
   private buildAmbientSnow(): void {
@@ -1820,8 +1870,8 @@ export class SkiEndlessGameScene extends Component {
 
       this.snowParticles.push({
         node,
-        x: -560 + Math.random() * 1120,
-        y: -320 + Math.random() * 760,
+        x: -330 + Math.random() * 660,
+        y: -620 + Math.random() * 1240,
         speed: 26 + Math.random() * 38
       });
     }
@@ -1850,12 +1900,14 @@ export class SkiEndlessGameScene extends Component {
 
       const parsed = JSON.parse(raw) as Partial<SkiLocalPreferences>;
       this.preferences = {
+        audioEnabled: parsed.audioEnabled ?? true,
         snowFxEnabled: parsed.snowFxEnabled ?? true,
         assistLinesEnabled: parsed.assistLinesEnabled ?? true,
         coachTipsEnabled: parsed.coachTipsEnabled ?? true
       };
     } catch {
       this.preferences = {
+        audioEnabled: true,
         snowFxEnabled: true,
         assistLinesEnabled: true,
         coachTipsEnabled: true
