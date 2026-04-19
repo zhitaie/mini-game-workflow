@@ -22,9 +22,9 @@ export interface SkiEndlessConfig {
 
 export const localSkiEndlessConfig: SkiEndlessConfig = {
   gameplay: {
-    baseSpeed: 8,
-    maxSpeed: 18,
-    obstacleDensity: 1,
+    baseSpeed: 6.6,
+    maxSpeed: 12.4,
+    obstacleDensity: 0.92,
     scorePerMeter: 1
   },
   rewardAd: {

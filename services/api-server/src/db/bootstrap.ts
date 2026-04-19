@@ -46,17 +46,17 @@ export function ensureDevelopmentSeedData(database: DatabaseConnection): void {
     }
   });
 
-  gameConfigRepository.ensureActive({
+  gameConfigRepository.setActive({
     gameKey: 'ski_endless',
     platform: 'web',
-    configVersion: 'ski-seed-web-v1',
+    configVersion: 'ski-seed-web-v2',
     minClientVersion: '0.1.0',
     maxClientVersion: '0.9.99',
     payload: {
       gameplay: {
-        baseSpeed: 8,
-        maxSpeed: 18,
-        obstacleDensity: 1,
+        baseSpeed: 6.6,
+        maxSpeed: 12.4,
+        obstacleDensity: 0.92,
         scorePerMeter: 1
       },
       rewardAd: {

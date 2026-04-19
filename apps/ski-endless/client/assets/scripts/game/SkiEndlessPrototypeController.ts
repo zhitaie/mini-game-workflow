@@ -80,6 +80,7 @@ export class SkiEndlessPrototypeController {
     map: SkiMapKey;
     baseSpeed: number;
     maxSpeed: number;
+    obstacleDensity: number;
   } {
     const config = this.runtime.config.getAll();
     const mode = input.mode ?? config.rotation.defaultMode;
@@ -97,7 +98,8 @@ export class SkiEndlessPrototypeController {
       mode,
       map,
       baseSpeed: config.gameplay.baseSpeed,
-      maxSpeed: config.gameplay.maxSpeed
+      maxSpeed: config.gameplay.maxSpeed,
+      obstacleDensity: config.gameplay.obstacleDensity
     };
   }
 

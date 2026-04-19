@@ -30,6 +30,7 @@ const { ccclass, property } = _decorator;
 type LaneIndex = -1 | 0 | 1;
 type EntityKind = 'obstacle' | 'coin';
 type ObstacleType = 'tree' | 'rock' | 'gate';
+type DifficultyStage = 'warmup' | 'flow' | 'rush' | 'whiteout';
 type ScenePhase = 'home' | 'rank' | 'notice' | 'running' | 'result';
 type ButtonActionId =
   | 'start_run'
@@ -48,19 +49,17 @@ const DESPAWN_Y = -420;
 const LANE_BASE_X = 185;
 const TRACK_HALF_WIDTH_TOP = 230;
 const TRACK_HALF_WIDTH_BOTTOM = 440;
-const RUN_ACCELERATION = 0.64;
 const DISTANCE_FACTOR = 12;
 const ENTITY_MOVE_FACTOR = 104;
 const STRIPE_MOVE_FACTOR = 72;
-const MIN_SPAWN_INTERVAL = 0.42;
-const BASE_SPAWN_INTERVAL = 0.98;
-const SPAWN_SPEED_FACTOR = 0.036;
+const MIN_SPAWN_INTERVAL = 0.52;
 
 interface ActiveRunState {
   mode: SkiModeKey;
   map: SkiMapKey;
   baseSpeed: number;
   maxSpeed: number;
+  obstacleDensity: number;
   distance: number;
   speed: number;
   coinsCollected: number;
@@ -68,6 +67,19 @@ interface ActiveRunState {
   reviveUsed: boolean;
   doubleClaimed: boolean;
   finished: boolean;
+  stage: DifficultyStage;
+}
+
+interface DifficultyProfile {
+  stage: DifficultyStage;
+  label: string;
+  acceleration: number;
+  speedCap: number;
+  spawnInterval: number;
+  twoObstacleChance: number;
+  coinChance: number;
+  bonusCoinChance: number;
+  obstaclePool: ObstacleType[];
 }
 
 interface TrackEntity {
@@ -129,7 +141,6 @@ export class SkiEndlessGameScene extends Component {
   private runState: ActiveRunState | null = null;
   private lastSummary: SkiRunSummary | null = null;
   private sessionUserId: number | null = null;
-  private lastCoinMilestone = 0;
   private busy = false;
   private savedCoinBank = 0;
   private spawnTimer = 0;
@@ -199,20 +210,19 @@ export class SkiEndlessGameScene extends Component {
     }
 
     const run = this.runState;
-    run.speed = Math.min(run.maxSpeed, run.speed + deltaTime * RUN_ACCELERATION);
-    run.distance += run.speed * deltaTime * DISTANCE_FACTOR;
-
-    const coinMilestone = Math.floor(run.distance / 28);
-    if (coinMilestone > this.lastCoinMilestone) {
-      run.coinsCollected += coinMilestone - this.lastCoinMilestone;
-      this.lastCoinMilestone = coinMilestone;
+    const difficulty = this.getDifficultyProfile(run);
+    if (run.stage !== difficulty.stage) {
+      run.stage = difficulty.stage;
+      this.resultLabel && (this.resultLabel.string = `${difficulty.label}\nThe slope is shifting.`);
     }
 
+    run.speed = Math.min(difficulty.speedCap, run.speed + deltaTime * difficulty.acceleration);
+    run.distance += run.speed * deltaTime * DISTANCE_FACTOR;
+
     this.spawnTimer += deltaTime;
-    const spawnInterval = Math.max(MIN_SPAWN_INTERVAL, BASE_SPAWN_INTERVAL - (run.speed - run.baseSpeed) * SPAWN_SPEED_FACTOR);
-    if (this.spawnTimer >= spawnInterval) {
+    if (this.spawnTimer >= difficulty.spawnInterval) {
       this.spawnTimer = 0;
-      this.spawnPattern();
+      this.spawnPattern(difficulty);
     }
 
     this.updateEntities(deltaTime, run.speed);
@@ -612,22 +622,24 @@ export class SkiEndlessGameScene extends Component {
     }
 
     const start = this.controller.startRun();
+    const initialStage: DifficultyStage = 'warmup';
     this.phase = 'running';
     this.runState = {
       mode: start.mode,
       map: start.map,
       baseSpeed: start.baseSpeed,
       maxSpeed: start.maxSpeed,
+      obstacleDensity: start.obstacleDensity,
       distance: 0,
       speed: start.baseSpeed,
       coinsCollected: 0,
       laneIndex: 0,
       reviveUsed: false,
       doubleClaimed: false,
-      finished: false
+      finished: false,
+      stage: initialStage
     };
     this.lastSummary = null;
-    this.lastCoinMilestone = 0;
     this.spawnTimer = 0;
     this.busy = false;
     this.clearEntities();
@@ -636,7 +648,7 @@ export class SkiEndlessGameScene extends Component {
     this.noticePanel && (this.noticePanel.active = false);
     this.resultPanel && (this.resultPanel.active = false);
     this.hudPanelRoot && (this.hudPanelRoot.active = true);
-    this.resultLabel && (this.resultLabel.string = 'Stay smooth. The slope gets faster.');
+    this.resultLabel && (this.resultLabel.string = 'Warm-up\nWide lanes and easy lines.');
     this.renderHint();
     this.updateSkierVisual(0);
     this.renderHud();
@@ -747,25 +759,88 @@ export class SkiEndlessGameScene extends Component {
     this.renderHud();
   }
 
-  private spawnPattern(): void {
+  private spawnPattern(profile: DifficultyProfile): void {
     if (!this.itemRoot || !this.runState) {
       return;
     }
 
     const lanes: LaneIndex[] = [-1, 0, 1].sort(() => Math.random() - 0.5) as LaneIndex[];
-    const obstacleCount = this.runState.speed > this.runState.baseSpeed + 5 ? 2 : 1;
-    const obstacleTypes: ObstacleType[] = ['tree', 'rock', 'gate'];
+    const obstacleCount = Math.random() < profile.twoObstacleChance ? 2 : 1;
 
     for (let index = 0; index < obstacleCount; index += 1) {
       const lane = lanes[index];
-      const obstacleType = obstacleTypes[Math.floor(Math.random() * obstacleTypes.length)];
-      this.spawnEntity('obstacle', lane, SPAWN_Y + index * 30, obstacleType);
+      const obstacleType = profile.obstaclePool[Math.floor(Math.random() * profile.obstaclePool.length)] ?? 'tree';
+      this.spawnEntity('obstacle', lane, SPAWN_Y + index * 34, obstacleType);
     }
 
-    const remainingLane = lanes.find((lane) => !this.entities.some((entity) => entity.laneIndex === lane && entity.y > 380));
-    if (remainingLane !== undefined && Math.random() > 0.2) {
-      this.spawnEntity('coin', remainingLane, SPAWN_Y + 70);
+    const safeLanes = lanes.filter((lane) => !lanes.slice(0, obstacleCount).includes(lane));
+    const primaryCoinLane = safeLanes[0];
+    if (primaryCoinLane !== undefined && Math.random() < profile.coinChance) {
+      this.spawnEntity('coin', primaryCoinLane, SPAWN_Y + 78);
     }
+
+    const bonusCoinLane = safeLanes[1];
+    if (bonusCoinLane !== undefined && Math.random() < profile.bonusCoinChance) {
+      this.spawnEntity('coin', bonusCoinLane, SPAWN_Y + 126);
+    }
+  }
+
+  private getDifficultyProfile(run: ActiveRunState): DifficultyProfile {
+    const density = Math.max(0.78, Math.min(1.08, run.obstacleDensity || 1));
+
+    if (run.distance < 260) {
+      return {
+        stage: 'warmup',
+        label: 'Warm-up',
+        acceleration: 0.16,
+        speedCap: Math.min(run.maxSpeed, run.baseSpeed + 0.9),
+        spawnInterval: Math.max(MIN_SPAWN_INTERVAL, 1.16 / density),
+        twoObstacleChance: 0.05,
+        coinChance: 0.88,
+        bonusCoinChance: 0.18,
+        obstaclePool: ['tree', 'rock']
+      };
+    }
+
+    if (run.distance < 760) {
+      return {
+        stage: 'flow',
+        label: 'Flow',
+        acceleration: 0.22,
+        speedCap: Math.min(run.maxSpeed, run.baseSpeed + 2.0),
+        spawnInterval: Math.max(MIN_SPAWN_INTERVAL, 0.98 / density),
+        twoObstacleChance: 0.2,
+        coinChance: 0.75,
+        bonusCoinChance: 0.22,
+        obstaclePool: ['tree', 'rock', 'gate']
+      };
+    }
+
+    if (run.distance < 1500) {
+      return {
+        stage: 'rush',
+        label: 'Rush',
+        acceleration: 0.28,
+        speedCap: Math.min(run.maxSpeed, run.baseSpeed + 3.4),
+        spawnInterval: Math.max(MIN_SPAWN_INTERVAL, 0.82 / density),
+        twoObstacleChance: 0.38,
+        coinChance: 0.62,
+        bonusCoinChance: 0.18,
+        obstaclePool: ['tree', 'rock', 'gate']
+      };
+    }
+
+    return {
+      stage: 'whiteout',
+      label: 'Whiteout',
+      acceleration: 0.32,
+      speedCap: run.maxSpeed,
+      spawnInterval: Math.max(MIN_SPAWN_INTERVAL, 0.72 / density),
+      twoObstacleChance: 0.52,
+      coinChance: 0.48,
+      bonusCoinChance: 0.14,
+      obstaclePool: ['tree', 'rock', 'gate']
+    };
   }
 
   private spawnEntity(kind: EntityKind, laneIndex: LaneIndex, y: number, obstacleType: ObstacleType = 'tree'): void {
@@ -970,12 +1045,9 @@ export class SkiEndlessGameScene extends Component {
     }
 
     this.hudLabel.string = [
-      `userId=${String(this.sessionUserId ?? 0)}`,
-      `mode=${this.runState.mode}`,
-      `map=${this.runState.map}`,
-      `distance=${String(Math.floor(this.runState.distance))}m`,
-      `speed=${this.runState.speed.toFixed(1)}`,
-      `lane=${String(this.runState.laneIndex)}`,
+      `Rider ${String(this.sessionUserId ?? 0)}`,
+      `pace=${this.runState.stage}`,
+      `line=${this.runState.laneIndex === -1 ? 'left' : this.runState.laneIndex === 1 ? 'right' : 'center'}`,
       `revive=${this.runState.reviveUsed ? 'used' : 'ready'}`
     ].join('\n');
 
@@ -1030,11 +1102,12 @@ export class SkiEndlessGameScene extends Component {
     }
 
     this.hintLabel.string = [
+        `Pace: ${this.runState?.stage ?? 'warmup'}`,
         'Desktop: A / D or Left / Right',
         'Mobile: tap left / right edge',
         '',
-        'Avoid trees, rocks, gates',
-        'Collect coins on safe lines'
+        'Read the safe lane first,',
+        'then take coins on clean lines.'
     ].join('\n');
   }
 
