@@ -1458,7 +1458,12 @@ export class SkiEndlessGameScene extends Component {
     this.skierNode.active = this.phase !== 'home';
     const bob = this.phase === 'running' ? Math.sin(this.animationClock * 8.2) * 4 : 0;
     const squash = this.phase === 'running' ? 1 + Math.sin(this.animationClock * 8.2) * 0.02 : 1;
-    this.skierNode.setPosition(this.getLaneX(laneIndex, 0.98), PLAYER_Y + bob, 0);
+    const playerLaneSpread = this.interpolate(
+      LANE_SPREAD_FAR,
+      LANE_SPREAD_NEAR,
+      this.getDepthCurve(PLAYER_COLLISION_DEPTH)
+    );
+    this.skierNode.setPosition(this.getLaneX(laneIndex, playerLaneSpread), PLAYER_Y + bob, 0);
     this.skierNode.setScale(squash, squash, 1);
     this.skierNode.angle = -laneIndex * 6;
   }
