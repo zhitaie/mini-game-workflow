@@ -17,6 +17,36 @@ interface RewardClaimResponse {
   status: string;
 }
 
+export interface SkiLeaderboardEntry {
+  rank: number;
+  gameUserId: number;
+  nickname: string;
+  bestDistance: number;
+  bestScore: number;
+}
+
+interface SkiLeaderboardResponse {
+  gameKey: string;
+  metric: 'best_distance';
+  items: SkiLeaderboardEntry[];
+  currentUser: SkiLeaderboardEntry | null;
+}
+
+export interface SkiNoticeItem {
+  id: number;
+  title: string;
+  content: string;
+  status: string;
+  startTime: number | null;
+  endTime: number | null;
+  updatedAt: number;
+}
+
+interface SkiNoticeListResponse {
+  gameKey: string;
+  items: SkiNoticeItem[];
+}
+
 export interface SkiRunStartInput {
   mode?: SkiModeKey;
   map?: SkiMapKey;
@@ -170,6 +200,28 @@ export class SkiEndlessPrototypeController {
       selectedMode: save.data.selectedMode,
       selectedMap: save.data.selectedMap
     };
+  }
+
+  async getLeaderboard(limit = 8): Promise<SkiLeaderboardResponse> {
+    return this.runtime.network.request<SkiLeaderboardResponse>({
+      path: '/api/rank',
+      method: 'GET',
+      requiresAuth: true,
+      query: {
+        gameKey: this.runtime.gameConfig.gameKey,
+        limit
+      }
+    });
+  }
+
+  async getNotices(): Promise<SkiNoticeListResponse> {
+    return this.runtime.network.request<SkiNoticeListResponse>({
+      path: '/api/notice',
+      method: 'GET',
+      query: {
+        gameKey: this.runtime.gameConfig.gameKey
+      }
+    });
   }
 
   private async persistSave(): Promise<void> {

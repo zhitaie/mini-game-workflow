@@ -18,15 +18,29 @@ import {
 } from 'cc';
 import { SkiRuntimeSessionStore } from '../app/SkiRuntimeSessionStore';
 import { type SkiMapKey, type SkiModeKey } from '../config/SkiEndlessConfig';
-import { SkiEndlessPrototypeController, type SkiRunSummary } from './SkiEndlessPrototypeController';
+import {
+  SkiEndlessPrototypeController,
+  type SkiLeaderboardEntry,
+  type SkiNoticeItem,
+  type SkiRunSummary
+} from './SkiEndlessPrototypeController';
 
 const { ccclass, property } = _decorator;
 
 type LaneIndex = -1 | 0 | 1;
 type EntityKind = 'obstacle' | 'coin';
 type ObstacleType = 'tree' | 'rock' | 'gate';
-type ScenePhase = 'home' | 'running' | 'result';
-type ButtonActionId = 'start_run' | 'view_rank' | 'view_notice' | 'revive' | 'double_coin' | 'restart' | 'back_home';
+type ScenePhase = 'home' | 'rank' | 'notice' | 'running' | 'result';
+type ButtonActionId =
+  | 'start_run'
+  | 'view_rank'
+  | 'view_notice'
+  | 'revive'
+  | 'double_coin'
+  | 'restart'
+  | 'back_home'
+  | 'close_rank'
+  | 'close_notice';
 
 const PLAYER_Y = -235;
 const SPAWN_Y = 470;
@@ -34,6 +48,13 @@ const DESPAWN_Y = -420;
 const LANE_BASE_X = 185;
 const TRACK_HALF_WIDTH_TOP = 230;
 const TRACK_HALF_WIDTH_BOTTOM = 440;
+const RUN_ACCELERATION = 0.64;
+const DISTANCE_FACTOR = 12;
+const ENTITY_MOVE_FACTOR = 104;
+const STRIPE_MOVE_FACTOR = 72;
+const MIN_SPAWN_INTERVAL = 0.42;
+const BASE_SPAWN_INTERVAL = 0.98;
+const SPAWN_SPEED_FACTOR = 0.036;
 
 interface ActiveRunState {
   mode: SkiModeKey;
@@ -122,16 +143,24 @@ export class SkiEndlessGameScene extends Component {
   private itemRoot: Node | null = null;
   private overlayRoot: Node | null = null;
   private homePanel: Node | null = null;
+  private rankPanel: Node | null = null;
+  private noticePanel: Node | null = null;
   private resultPanel: Node | null = null;
   private homeTitleLabel: Label | null = null;
   private homeInfoLabel: Label | null = null;
   private homeToastLabel: Label | null = null;
   private homeBadgeLabel: Label | null = null;
+  private rankTitleLabel: Label | null = null;
+  private rankInfoLabel: Label | null = null;
+  private noticeTitleLabel: Label | null = null;
+  private noticeInfoLabel: Label | null = null;
   private resultTitleLabel: Label | null = null;
   private resultInfoLabel: Label | null = null;
   private hudPanelRoot: Node | null = null;
 
   private homeButtons: UIButton[] = [];
+  private rankButtons: UIButton[] = [];
+  private noticeButtons: UIButton[] = [];
   private resultButtons: UIButton[] = [];
   private hudCards: UIStatCard[] = [];
 
@@ -170,8 +199,8 @@ export class SkiEndlessGameScene extends Component {
     }
 
     const run = this.runState;
-    run.speed = Math.min(run.maxSpeed, run.speed + deltaTime * 0.8);
-    run.distance += run.speed * deltaTime * 13;
+    run.speed = Math.min(run.maxSpeed, run.speed + deltaTime * RUN_ACCELERATION);
+    run.distance += run.speed * deltaTime * DISTANCE_FACTOR;
 
     const coinMilestone = Math.floor(run.distance / 28);
     if (coinMilestone > this.lastCoinMilestone) {
@@ -180,7 +209,7 @@ export class SkiEndlessGameScene extends Component {
     }
 
     this.spawnTimer += deltaTime;
-    const spawnInterval = Math.max(0.38, 0.92 - (run.speed - run.baseSpeed) * 0.04);
+    const spawnInterval = Math.max(MIN_SPAWN_INTERVAL, BASE_SPAWN_INTERVAL - (run.speed - run.baseSpeed) * SPAWN_SPEED_FACTOR);
     if (this.spawnTimer >= spawnInterval) {
       this.spawnTimer = 0;
       this.spawnPattern();
@@ -223,6 +252,17 @@ export class SkiEndlessGameScene extends Component {
       }
     }
 
+    if (this.phase === 'rank' || this.phase === 'notice') {
+      switch (event.keyCode) {
+        case KeyCode.KEY_H:
+        case KeyCode.ESCAPE:
+          this.showHomeScreen();
+          return;
+        default:
+          return;
+      }
+    }
+
     if (!this.runState) {
       return;
     }
@@ -256,6 +296,20 @@ export class SkiEndlessGameScene extends Component {
 
     if (this.phase === 'result') {
       if (this.tryHandleButtons(location, this.resultButtons)) {
+        return;
+      }
+      return;
+    }
+
+    if (this.phase === 'rank') {
+      if (this.tryHandleButtons(location, this.rankButtons)) {
+        return;
+      }
+      return;
+    }
+
+    if (this.phase === 'notice') {
+      if (this.tryHandleButtons(location, this.noticeButtons)) {
         return;
       }
       return;
@@ -409,11 +463,17 @@ export class SkiEndlessGameScene extends Component {
 
     this.hudPanelRoot = this.ensureChildNode(this.overlayRoot, 'HudPanelRoot', 2);
     this.homePanel = this.ensureChildNode(this.overlayRoot, 'HomePanel', 3);
-    this.resultPanel = this.ensureChildNode(this.overlayRoot, 'ResultPanel', 4);
+    this.rankPanel = this.ensureChildNode(this.overlayRoot, 'RankPanel', 4);
+    this.noticePanel = this.ensureChildNode(this.overlayRoot, 'NoticePanel', 5);
+    this.resultPanel = this.ensureChildNode(this.overlayRoot, 'ResultPanel', 6);
 
     this.hudPanelRoot.removeAllChildren();
     const homeBackground = this.ensureGraphics(this.homePanel);
     this.drawPanelBackground(homeBackground, 0, 32, 650, 540, new Color(11, 23, 39, 232));
+    const rankBackground = this.ensureGraphics(this.rankPanel);
+    this.drawPanelBackground(rankBackground, 0, 28, 650, 540, new Color(11, 23, 39, 236));
+    const noticeBackground = this.ensureGraphics(this.noticePanel);
+    this.drawPanelBackground(noticeBackground, 0, 28, 650, 540, new Color(11, 23, 39, 236));
 
     const resultBackground = this.ensureGraphics(this.resultPanel);
     this.drawPanelBackground(resultBackground, 0, -6, 650, 438, new Color(14, 22, 36, 234));
@@ -422,6 +482,10 @@ export class SkiEndlessGameScene extends Component {
     this.homeBadgeLabel = this.ensureLabelNode(this.homePanel, 'HomeBadge', 20);
     this.homeInfoLabel = this.ensureLabelNode(this.homePanel, 'HomeInfo', 28);
     this.homeToastLabel = this.ensureLabelNode(this.homePanel, 'HomeToast', 22);
+    this.rankTitleLabel = this.ensureLabelNode(this.rankPanel, 'RankTitle', 44);
+    this.rankInfoLabel = this.ensureLabelNode(this.rankPanel, 'RankInfo', 24);
+    this.noticeTitleLabel = this.ensureLabelNode(this.noticePanel, 'NoticeTitle', 44);
+    this.noticeInfoLabel = this.ensureLabelNode(this.noticePanel, 'NoticeInfo', 24);
     this.resultTitleLabel = this.ensureLabelNode(this.resultPanel, 'ResultTitle', 44);
     this.resultInfoLabel = this.ensureLabelNode(this.resultPanel, 'ResultInfo', 26);
 
@@ -429,6 +493,10 @@ export class SkiEndlessGameScene extends Component {
     this.configureLabelNode(this.homeBadgeLabel, new Vec3(0, 120, 0), HorizontalTextAlignment.CENTER, 430, 46, 20, 24);
     this.configureLabelNode(this.homeInfoLabel, new Vec3(0, 38, 0), HorizontalTextAlignment.CENTER, 560, 220, 28, 36);
     this.configureLabelNode(this.homeToastLabel, new Vec3(0, -170, 0), HorizontalTextAlignment.CENTER, 560, 72, 22, 28);
+    this.configureLabelNode(this.rankTitleLabel, new Vec3(0, 186, 0), HorizontalTextAlignment.CENTER, 540, 70, 44, 50);
+    this.configureLabelNode(this.rankInfoLabel, new Vec3(0, 4, 0), HorizontalTextAlignment.LEFT, 560, 330, 24, 30);
+    this.configureLabelNode(this.noticeTitleLabel, new Vec3(0, 186, 0), HorizontalTextAlignment.CENTER, 540, 70, 44, 50);
+    this.configureLabelNode(this.noticeInfoLabel, new Vec3(0, 4, 0), HorizontalTextAlignment.LEFT, 560, 330, 24, 30);
     this.configureLabelNode(this.resultTitleLabel, new Vec3(0, 140, 0), HorizontalTextAlignment.CENTER, 520, 70, 46, 52);
     this.configureLabelNode(this.resultInfoLabel, new Vec3(0, 28, 0), HorizontalTextAlignment.CENTER, 560, 190, 26, 32);
 
@@ -437,12 +505,26 @@ export class SkiEndlessGameScene extends Component {
         activeColor: new Color(20, 152, 108, 255),
         disabledColor: new Color(77, 92, 92, 255)
       }),
-      this.createButton(this.homePanel, 'RankButton', 'Rank (Soon)', new Vec3(-150, -134, 0), 'view_rank', { width: 220, height: 56 }, {
+      this.createButton(this.homePanel, 'RankButton', 'Leaderboard', new Vec3(-150, -134, 0), 'view_rank', { width: 220, height: 56 }, {
         activeColor: new Color(43, 87, 162, 255),
         disabledColor: new Color(77, 84, 97, 255)
       }),
-      this.createButton(this.homePanel, 'NoticeButton', 'Notice (Soon)', new Vec3(150, -134, 0), 'view_notice', { width: 220, height: 56 }, {
+      this.createButton(this.homePanel, 'NoticeButton', 'Notice', new Vec3(150, -134, 0), 'view_notice', { width: 220, height: 56 }, {
         activeColor: new Color(54, 99, 173, 255),
+        disabledColor: new Color(77, 84, 97, 255)
+      })
+    ];
+
+    this.rankButtons = [
+      this.createButton(this.rankPanel, 'RankBackButton', 'Back Home', new Vec3(0, -186, 0), 'close_rank', { width: 240, height: 58 }, {
+        activeColor: new Color(87, 95, 120, 255),
+        disabledColor: new Color(77, 84, 97, 255)
+      })
+    ];
+
+    this.noticeButtons = [
+      this.createButton(this.noticePanel, 'NoticeBackButton', 'Back Home', new Vec3(0, -186, 0), 'close_notice', { width: 240, height: 58 }, {
+        activeColor: new Color(87, 95, 120, 255),
         disabledColor: new Color(77, 84, 97, 255)
       })
     ];
@@ -480,8 +562,11 @@ export class SkiEndlessGameScene extends Component {
     this.lastSummary = null;
     this.busy = false;
     this.homePanel && (this.homePanel.active = true);
+    this.rankPanel && (this.rankPanel.active = false);
+    this.noticePanel && (this.noticePanel.active = false);
     this.resultPanel && (this.resultPanel.active = false);
     this.savedCoinBank = this.controller?.getSnapshot().coins ?? this.savedCoinBank;
+    this.skierNode && (this.skierNode.active = false);
 
     if (this.homeTitleLabel) {
       this.homeTitleLabel.string = 'SKI ENDLESS';
@@ -547,12 +632,100 @@ export class SkiEndlessGameScene extends Component {
     this.busy = false;
     this.clearEntities();
     this.homePanel && (this.homePanel.active = false);
+    this.rankPanel && (this.rankPanel.active = false);
+    this.noticePanel && (this.noticePanel.active = false);
     this.resultPanel && (this.resultPanel.active = false);
     this.hudPanelRoot && (this.hudPanelRoot.active = true);
     this.resultLabel && (this.resultLabel.string = 'Stay smooth. The slope gets faster.');
     this.renderHint();
     this.updateSkierVisual(0);
     this.renderHud();
+  }
+
+  private async showRankScreen(): Promise<void> {
+    if (!this.controller) {
+      return;
+    }
+
+    this.phase = 'rank';
+    this.clearEntities();
+    this.runState = null;
+    this.homePanel && (this.homePanel.active = false);
+    this.noticePanel && (this.noticePanel.active = false);
+    this.resultPanel && (this.resultPanel.active = false);
+    this.rankPanel && (this.rankPanel.active = true);
+    this.hudPanelRoot && (this.hudPanelRoot.active = false);
+    this.skierNode && (this.skierNode.active = false);
+
+    if (this.rankTitleLabel) {
+      this.rankTitleLabel.string = 'SNOWFIELD LEADERBOARD';
+    }
+
+    if (this.rankInfoLabel) {
+      this.rankInfoLabel.string = 'Loading top riders...';
+    }
+
+    this.resultLabel && (this.resultLabel.string = '');
+    this.renderHint();
+
+    try {
+      const leaderboard = await this.controller.getLeaderboard(8);
+
+      if (this.phase !== 'rank' || !this.rankInfoLabel) {
+        return;
+      }
+
+      this.rankInfoLabel.string = this.formatLeaderboard(leaderboard.items, leaderboard.currentUser);
+    } catch (error) {
+      if (this.phase !== 'rank' || !this.rankInfoLabel) {
+        return;
+      }
+
+      this.rankInfoLabel.string = `Unable to load leaderboard.\n\n${this.formatErrorMessage(error)}`;
+    }
+  }
+
+  private async showNoticeScreen(): Promise<void> {
+    if (!this.controller) {
+      return;
+    }
+
+    this.phase = 'notice';
+    this.clearEntities();
+    this.runState = null;
+    this.homePanel && (this.homePanel.active = false);
+    this.rankPanel && (this.rankPanel.active = false);
+    this.resultPanel && (this.resultPanel.active = false);
+    this.noticePanel && (this.noticePanel.active = true);
+    this.hudPanelRoot && (this.hudPanelRoot.active = false);
+    this.skierNode && (this.skierNode.active = false);
+
+    if (this.noticeTitleLabel) {
+      this.noticeTitleLabel.string = 'MOUNTAIN NOTICE';
+    }
+
+    if (this.noticeInfoLabel) {
+      this.noticeInfoLabel.string = 'Loading notice board...';
+    }
+
+    this.resultLabel && (this.resultLabel.string = '');
+    this.renderHint();
+
+    try {
+      const noticeList = await this.controller.getNotices();
+
+      if (this.phase !== 'notice' || !this.noticeInfoLabel) {
+        return;
+      }
+
+      this.noticeInfoLabel.string = this.formatNoticeList(noticeList.items);
+    } catch (error) {
+      if (this.phase !== 'notice' || !this.noticeInfoLabel) {
+        return;
+      }
+
+      this.noticeInfoLabel.string = `Unable to load notices.\n\n${this.formatErrorMessage(error)}`;
+    }
   }
 
   private shiftLane(delta: -1 | 1): void {
@@ -626,7 +799,7 @@ export class SkiEndlessGameScene extends Component {
   }
 
   private updateEntities(deltaTime: number, speed: number): void {
-    const moveDelta = speed * deltaTime * 115;
+    const moveDelta = speed * deltaTime * ENTITY_MOVE_FACTOR;
     const survivors: TrackEntity[] = [];
 
     for (const entity of this.entities) {
@@ -680,6 +853,8 @@ export class SkiEndlessGameScene extends Component {
       this.phase = 'result';
       this.resultPanel && (this.resultPanel.active = true);
       this.homePanel && (this.homePanel.active = false);
+      this.rankPanel && (this.rankPanel.active = false);
+      this.noticePanel && (this.noticePanel.active = false);
       this.hudPanelRoot && (this.hudPanelRoot.active = true);
 
       if (this.resultTitleLabel) {
@@ -721,6 +896,7 @@ export class SkiEndlessGameScene extends Component {
       this.resultPanel && (this.resultPanel.active = false);
       this.resultLabel && (this.resultLabel.string = `Revived\nverification=${verification.verificationId}`);
       this.hudPanelRoot && (this.hudPanelRoot.active = true);
+      this.skierNode && (this.skierNode.active = true);
       this.renderHud();
       this.renderHint();
     } finally {
@@ -759,7 +935,7 @@ export class SkiEndlessGameScene extends Component {
       return;
     }
 
-    const stripeDelta = this.runState.speed * deltaTime * 80;
+    const stripeDelta = this.runState.speed * deltaTime * STRIPE_MOVE_FACTOR;
     const cycleHeight = 680;
 
     for (const stripe of this.stripes) {
@@ -819,6 +995,26 @@ export class SkiEndlessGameScene extends Component {
         'Swipe or tap left / right to switch lanes',
         '',
         'Keep a clean line and hold your nerve.'
+      ].join('\n');
+      return;
+    }
+
+    if (this.phase === 'rank') {
+      this.hintLabel.string = [
+        'Review the top snowfield runs.',
+        '',
+        'Tap Back Home when you are ready',
+        'to head back onto the slope.'
+      ].join('\n');
+      return;
+    }
+
+    if (this.phase === 'notice') {
+      this.hintLabel.string = [
+        'Check current mountain updates,',
+        'mode status, and live notices.',
+        '',
+        'Tap Back Home to return.'
       ].join('\n');
       return;
     }
@@ -940,10 +1136,10 @@ export class SkiEndlessGameScene extends Component {
         this.startNewRun();
         break;
       case 'view_rank':
-        this.homeToastLabel && (this.homeToastLabel.string = 'Rank page will be wired after gameplay polish.');
+        void this.showRankScreen();
         break;
       case 'view_notice':
-        this.homeToastLabel && (this.homeToastLabel.string = 'Notice page will be wired after gameplay polish.');
+        void this.showNoticeScreen();
         break;
       case 'revive':
         void this.reviveRun();
@@ -955,6 +1151,12 @@ export class SkiEndlessGameScene extends Component {
         this.startNewRun();
         break;
       case 'back_home':
+        this.showHomeScreen();
+        break;
+      case 'close_rank':
+        this.showHomeScreen();
+        break;
+      case 'close_notice':
         this.showHomeScreen();
         break;
       default:
@@ -1031,6 +1233,78 @@ export class SkiEndlessGameScene extends Component {
   private clearEntities(): void {
     this.entities.forEach((entity) => entity.node.destroy());
     this.entities = [];
+  }
+
+  private formatLeaderboard(items: SkiLeaderboardEntry[], currentUser: SkiLeaderboardEntry | null): string {
+    if (items.length === 0) {
+      return [
+        'No distance records yet.',
+        '',
+        'Run the mountain once and',
+        'the first leaderboard entry will appear here.'
+      ].join('\n');
+    }
+
+    const topRows = items.map((entry) => {
+      const rank = `#${String(entry.rank).padStart(2, '0')}`;
+      const nickname = entry.nickname.padEnd(12, ' ').slice(0, 12);
+      return `${rank}  ${nickname}  ${String(entry.bestDistance).padStart(4, ' ')}m`;
+    });
+
+    if (!currentUser) {
+      return [
+        'Top Distance',
+        '',
+        ...topRows
+      ].join('\n');
+    }
+
+    return [
+      'Top Distance',
+      '',
+      ...topRows,
+      '',
+      `You: #${String(currentUser.rank)}  ${currentUser.bestDistance}m  (${currentUser.nickname})`
+    ].join('\n');
+  }
+
+  private formatNoticeList(items: SkiNoticeItem[]): string {
+    if (items.length === 0) {
+      return [
+        'No live notices.',
+        '',
+        'When a new mountain update is published,',
+        'it will appear here.'
+      ].join('\n');
+    }
+
+    return items
+      .slice(0, 3)
+      .map((item) =>
+        [
+          item.title,
+          this.formatTimestamp(item.updatedAt),
+          item.content
+        ].join('\n')
+      )
+      .join('\n\n');
+  }
+
+  private formatTimestamp(timestamp: number): string {
+    const date = new Date(timestamp);
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    return `${month}-${day} ${hours}:${minutes}`;
+  }
+
+  private formatErrorMessage(error: unknown): string {
+    if (error instanceof Error && error.message.trim() !== '') {
+      return error.message;
+    }
+
+    return 'Unknown error';
   }
 
   private ensureChildNode(parent: Node, name: string, siblingIndex: number): Node {

@@ -82,6 +82,17 @@ export function ensureDevelopmentSeedData(database: DatabaseConnection): void {
       endTime: null
     });
   }
+
+  if (noticeRepository.list({ gameKey: 'ski_endless' }).length === 0) {
+    noticeRepository.create({
+      gameKey: 'ski_endless',
+      title: '雪场开放中',
+      content: '当前开放 Snowfield Endless 模式。第一版已接入复活、双倍奖励和全服距离榜。',
+      status: 'active',
+      startTime: null,
+      endTime: null
+    });
+  }
 }
 
 export function initializeDevelopmentDatabase(options: DatabaseConnectionOptions = {}): DatabaseConnection {

@@ -22,6 +22,7 @@ import { AnalyticsService } from './modules/analytics/analytics.service.js';
 import { AuthService } from './modules/auth/auth.service.js';
 import { ConfigService } from './modules/config/config.service.js';
 import { NoticeService } from './modules/notice/notice.service.js';
+import { RankService } from './modules/rank/rank.service.js';
 import { RewardService } from './modules/reward/reward.service.js';
 import { SaveService } from './modules/save/save.service.js';
 
@@ -269,6 +270,7 @@ export function createApp(options: CreateAppOptions = {}): ApiApp {
   const authService = new AuthService(gameUserRepository);
   const configService = new ConfigService(gameConfigRepository);
   const noticeService = new NoticeService(noticeRepository);
+  const rankService = new RankService(gameUserRepository, userSaveRepository);
   const rewardService = new RewardService(database, rewardLogRepository, userAssetBalanceRepository, adLogRepository);
   const saveService = new SaveService(userSaveRepository);
 
@@ -399,6 +401,16 @@ export function createApp(options: CreateAppOptions = {}): ApiApp {
 
         if (url.pathname === '/api/notice' && method === 'GET') {
           return json(noticeService.list(String(url.searchParams.get('gameKey') ?? '')));
+        }
+
+        if (url.pathname === '/api/rank' && method === 'GET') {
+          return json(
+            rankService.getDistanceLeaderboard(
+              String(url.searchParams.get('gameKey') ?? ''),
+              url.searchParams.get('limit') ? Number(url.searchParams.get('limit')) : undefined,
+              resolveOptionalClaims(init?.headers)
+            )
+          );
         }
 
         if (url.pathname === '/api/save' && method === 'GET') {

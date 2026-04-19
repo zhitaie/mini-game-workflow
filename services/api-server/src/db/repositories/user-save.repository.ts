@@ -83,4 +83,31 @@ export class UserSaveRepository {
 
     return record;
   }
+
+  listByGameKey(gameKey: string): StoredSaveRecord[] {
+    const rows = this.database.sqlite
+      .prepare(
+        `
+          SELECT game_key, game_user_id, schema_version, save_data_json, updated_at
+          FROM user_save
+          WHERE game_key = ?
+          ORDER BY updated_at DESC
+        `
+      )
+      .all(gameKey) as Array<{
+      game_key: string;
+      game_user_id: number;
+      schema_version: number;
+      save_data_json: string;
+      updated_at: number;
+    }>;
+
+    return rows.map((row) => ({
+      gameKey: row.game_key,
+      gameUserId: row.game_user_id,
+      schemaVersion: row.schema_version,
+      data: JSON.parse(row.save_data_json) as Record<string, unknown>,
+      updatedAt: row.updated_at
+    }));
+  }
 }
