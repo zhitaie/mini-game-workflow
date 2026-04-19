@@ -1,210 +1,254 @@
+import { AudioClip, AudioSource, Node, resources } from 'cc';
+
 type SkiBgmMode = 'none' | 'home' | 'run' | 'result';
+type SkiBgmAssetKey = Exclude<SkiBgmMode, 'none'>;
+type SkiSfxAssetKey = 'button' | 'coin' | 'crash' | 'lane' | 'restart' | 'revive' | 'reward';
+
+const BGM_PATHS: Record<SkiBgmAssetKey, string[]> = {
+  home: ['ski/audio/bgm/home-loop'],
+  run: ['ski/audio/bgm/run-loop'],
+  result: ['ski/audio/bgm/result-loop']
+};
+
+const SFX_PATHS: Record<SkiSfxAssetKey, string[]> = {
+  button: ['ski/audio/sfx/ui-click-sfx', 'ski/audio/sfx/ui-click'],
+  coin: ['ski/audio/sfx/coin-sfx', 'ski/audio/sfx/coin'],
+  crash: ['ski/audio/sfx/crash-sfx', 'ski/audio/sfx/crash'],
+  lane: ['ski/audio/sfx/lane-shift-sfx', 'ski/audio/sfx/lane-shift'],
+  restart: ['ski/audio/sfx/ui-click-sfx', 'ski/audio/sfx/ui-click'],
+  revive: ['ski/audio/sfx/ui-click-sfx', 'ski/audio/sfx/ui-click'],
+  reward: ['ski/audio/sfx/ui-click-sfx', 'ski/audio/sfx/ui-click']
+};
+
+const BGM_VOLUMES: Record<SkiBgmAssetKey, number> = {
+  home: 0.5,
+  run: 0.58,
+  result: 0.46
+};
+
+const SFX_VOLUMES: Record<SkiSfxAssetKey, number> = {
+  button: 0.8,
+  coin: 0.92,
+  crash: 0.88,
+  lane: 0.72,
+  restart: 0.74,
+  revive: 0.8,
+  reward: 0.84
+};
 
 export class SkiAudioDirector {
-  private audioContext: AudioContext | null = null;
-  private masterGain: GainNode | null = null;
-  private bgmGain: GainNode | null = null;
-  private bgmOscillators: OscillatorNode[] = [];
+  private hostNode: Node | null = null;
+  private bgmSource: AudioSource | null = null;
+  private sfxSource: AudioSource | null = null;
+  private readonly clipCache = new Map<string, AudioClip | null>();
+  private readonly pendingLoads = new Map<string, Promise<AudioClip | null>>();
   private bgmMode: SkiBgmMode = 'none';
   private enabled = true;
+  private unlocked = false;
+  private activeBgmPath: string | null = null;
+
+  attachHost(hostNode: Node): void {
+    if (this.hostNode === hostNode && this.bgmSource && this.sfxSource) {
+      return;
+    }
+
+    this.hostNode = hostNode;
+
+    const bgmNode = hostNode.getChildByName('AudioBgm') ?? new Node('AudioBgm');
+    if (!bgmNode.parent) {
+      hostNode.addChild(bgmNode);
+    }
+
+    const sfxNode = hostNode.getChildByName('AudioSfx') ?? new Node('AudioSfx');
+    if (!sfxNode.parent) {
+      hostNode.addChild(sfxNode);
+    }
+
+    this.bgmSource = bgmNode.getComponent(AudioSource) ?? bgmNode.addComponent(AudioSource);
+    this.sfxSource = sfxNode.getComponent(AudioSource) ?? sfxNode.addComponent(AudioSource);
+    this.bgmSource.loop = true;
+    this.bgmSource.playOnAwake = false;
+    this.sfxSource.playOnAwake = false;
+    this.bgmSource.volume = 0;
+    this.sfxSource.volume = 1;
+  }
+
+  preload(): void {
+    void Promise.all([
+      ...Object.values(BGM_PATHS).map((paths) => this.loadClip(paths)),
+      ...Object.values(SFX_PATHS).map((paths) => this.loadClip(paths))
+    ]);
+  }
 
   setAudioEnabled(enabled: boolean): void {
     this.enabled = enabled;
 
     if (!enabled) {
       this.stopBgm();
-      if (this.masterGain && this.audioContext) {
-        this.masterGain.gain.cancelScheduledValues(this.audioContext.currentTime);
-        this.masterGain.gain.setValueAtTime(0.0001, this.audioContext.currentTime);
-      }
       return;
     }
 
-    const context = this.ensureContext();
-    if (!context || !this.masterGain) {
-      return;
+    if (this.unlocked) {
+      void this.applyBgmMode();
     }
-
-    this.masterGain.gain.cancelScheduledValues(context.currentTime);
-    this.masterGain.gain.setValueAtTime(0.2, context.currentTime);
-    this.setBgmMode(this.bgmMode);
   }
 
   unlock(): void {
-    const context = this.ensureContext();
-    if (!context || !this.enabled) {
-      return;
-    }
-
-    if (context.state === 'suspended') {
-      void context.resume();
-    }
-
-    if (this.bgmMode !== 'none' && this.bgmOscillators.length === 0) {
-      this.setBgmMode(this.bgmMode);
+    this.unlocked = true;
+    if (this.enabled) {
+      void this.applyBgmMode();
     }
   }
 
   setBgmMode(mode: SkiBgmMode): void {
     this.bgmMode = mode;
-
-    if (!this.enabled) {
-      return;
+    if (this.enabled && this.unlocked) {
+      void this.applyBgmMode();
     }
-
-    const context = this.ensureContext();
-    if (!context || !this.masterGain) {
-      return;
-    }
-
-    this.stopBgm();
-
-    if (mode === 'none') {
-      return;
-    }
-
-    this.bgmGain = context.createGain();
-    this.bgmGain.gain.setValueAtTime(0.0001, context.currentTime);
-    this.bgmGain.connect(this.masterGain);
-
-    const configs =
-      mode === 'home'
-        ? [
-            { frequency: 196, type: 'sine' as OscillatorType, gain: 0.05 },
-            { frequency: 293.66, type: 'triangle' as OscillatorType, gain: 0.024 }
-          ]
-        : mode === 'run'
-          ? [
-              { frequency: 110, type: 'sawtooth' as OscillatorType, gain: 0.042 },
-              { frequency: 220, type: 'triangle' as OscillatorType, gain: 0.02 }
-            ]
-          : [
-              { frequency: 164.81, type: 'triangle' as OscillatorType, gain: 0.036 },
-              { frequency: 246.94, type: 'sine' as OscillatorType, gain: 0.018 }
-            ];
-
-    for (const config of configs) {
-      const oscillator = context.createOscillator();
-      const gainNode = context.createGain();
-      oscillator.type = config.type;
-      oscillator.frequency.setValueAtTime(config.frequency, context.currentTime);
-      gainNode.gain.setValueAtTime(config.gain, context.currentTime);
-      oscillator.connect(gainNode);
-      gainNode.connect(this.bgmGain);
-      oscillator.start();
-      this.bgmOscillators.push(oscillator);
-    }
-
-    this.bgmGain.gain.exponentialRampToValueAtTime(1, context.currentTime + 0.28);
   }
 
   playButton(): void {
-    this.playTone(540, 0.08, 'triangle', 0.03);
+    void this.playSfx('button');
   }
 
   playCoin(): void {
-    this.playTone(940, 0.06, 'triangle', 0.035);
-    this.playTone(1280, 0.08, 'sine', 0.02, 0.04);
+    void this.playSfx('coin');
   }
 
   playCrash(): void {
-    this.playTone(130, 0.18, 'sawtooth', 0.05);
-    this.playTone(92, 0.22, 'triangle', 0.04, 0.03);
+    void this.playSfx('crash');
+  }
+
+  playLaneShift(): void {
+    void this.playSfx('lane');
   }
 
   playRevive(): void {
-    this.playTone(392, 0.1, 'triangle', 0.03);
-    this.playTone(523.25, 0.12, 'triangle', 0.028, 0.06);
-    this.playTone(659.25, 0.12, 'sine', 0.022, 0.12);
+    void this.playSfx('revive');
   }
 
   playReward(): void {
-    this.playTone(523.25, 0.08, 'triangle', 0.03);
-    this.playTone(659.25, 0.1, 'triangle', 0.028, 0.05);
-    this.playTone(783.99, 0.12, 'sine', 0.024, 0.1);
+    void this.playSfx('reward');
   }
 
   playRestart(): void {
-    this.playTone(320, 0.05, 'triangle', 0.028);
-    this.playTone(440, 0.08, 'triangle', 0.025, 0.05);
+    void this.playSfx('restart');
   }
 
   dispose(): void {
     this.stopBgm();
+    this.bgmSource = null;
+    this.sfxSource = null;
+    this.hostNode = null;
   }
 
-  private playTone(
-    frequency: number,
-    duration: number,
-    type: OscillatorType,
-    volume: number,
-    delay = 0
-  ): void {
-    if (!this.enabled) {
+  private async applyBgmMode(): Promise<void> {
+    if (!this.enabled || !this.unlocked || !this.bgmSource) {
       return;
     }
 
-    const context = this.ensureContext();
-    if (!context || !this.masterGain) {
+    if (this.bgmMode === 'none') {
+      this.stopBgm();
       return;
     }
 
-    const start = context.currentTime + delay;
-    const oscillator = context.createOscillator();
-    const gainNode = context.createGain();
-    oscillator.type = type;
-    oscillator.frequency.setValueAtTime(frequency, start);
-    gainNode.gain.setValueAtTime(0.0001, start);
-    gainNode.gain.exponentialRampToValueAtTime(volume, start + 0.01);
-    gainNode.gain.exponentialRampToValueAtTime(0.0001, start + duration);
-    oscillator.connect(gainNode);
-    gainNode.connect(this.masterGain);
-    oscillator.start(start);
-    oscillator.stop(start + duration + 0.02);
-  }
+    const requestedMode = this.bgmMode;
+    const paths = BGM_PATHS[requestedMode];
+    const clip = await this.loadClip(paths);
+    const path = clip ? this.resolveLoadedPath(paths) : null;
 
-  private ensureContext(): AudioContext | null {
-    if (typeof window === 'undefined') {
-      return null;
+    if (!clip || !path || !this.bgmSource || this.bgmMode !== requestedMode || !this.enabled || !this.unlocked) {
+      return;
     }
 
-    if (!this.audioContext) {
-      const AudioContextCtor = window.AudioContext ?? (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-      if (!AudioContextCtor) {
-        return null;
+    if (this.activeBgmPath === path && this.bgmSource.playing) {
+      this.bgmSource.volume = BGM_VOLUMES[requestedMode];
+      return;
+    }
+
+    this.bgmSource.stop();
+    this.bgmSource.clip = clip;
+    this.bgmSource.loop = true;
+    this.bgmSource.volume = BGM_VOLUMES[requestedMode];
+    this.bgmSource.play();
+    this.activeBgmPath = path;
+  }
+
+  private async playSfx(key: SkiSfxAssetKey): Promise<void> {
+    if (!this.enabled || !this.unlocked || !this.sfxSource) {
+      return;
+    }
+
+    const clip = await this.loadClip(SFX_PATHS[key]);
+    if (!clip || !this.sfxSource || !this.enabled || !this.unlocked) {
+      return;
+    }
+
+    this.sfxSource.playOneShot(clip, SFX_VOLUMES[key]);
+  }
+
+  private async loadClip(paths: string | string[]): Promise<AudioClip | null> {
+    const candidates = Array.isArray(paths) ? paths : [paths];
+
+    for (const path of candidates) {
+      const clip = await this.loadSingleClip(path);
+      if (clip) {
+        return clip;
       }
-
-      this.audioContext = new AudioContextCtor();
-      this.masterGain = this.audioContext.createGain();
-      this.masterGain.gain.setValueAtTime(0.2, this.audioContext.currentTime);
-      this.masterGain.connect(this.audioContext.destination);
     }
 
-    if (this.audioContext.state === 'suspended') {
-      void this.audioContext.resume();
+    return null;
+  }
+
+  private resolveLoadedPath(paths: string[]): string | null {
+    for (const path of paths) {
+      if (this.clipCache.get(path)) {
+        return path;
+      }
     }
 
-    return this.audioContext;
+    return null;
+  }
+
+  private loadSingleClip(path: string): Promise<AudioClip | null> {
+    const cached = this.clipCache.get(path);
+    if (cached !== undefined) {
+      return Promise.resolve(cached);
+    }
+
+    const pending = this.pendingLoads.get(path);
+    if (pending) {
+      return pending;
+    }
+
+    const loadPromise = new Promise<AudioClip | null>((resolve) => {
+      resources.load(path, AudioClip, (error, clip) => {
+        if (error) {
+          this.clipCache.set(path, null);
+          this.pendingLoads.delete(path);
+          resolve(null);
+          return;
+        }
+
+        this.clipCache.set(path, clip);
+        this.pendingLoads.delete(path);
+        resolve(clip);
+      });
+    });
+
+    this.pendingLoads.set(path, loadPromise);
+    return loadPromise;
   }
 
   private stopBgm(): void {
-    for (const oscillator of this.bgmOscillators) {
-      try {
-        oscillator.stop();
-      } catch {
-        // Ignore repeated stop on disposed nodes.
-      }
-      oscillator.disconnect();
-    }
-    this.bgmOscillators = [];
-
-    if (this.bgmGain && this.audioContext) {
-      this.bgmGain.gain.cancelScheduledValues(this.audioContext.currentTime);
-      this.bgmGain.gain.setValueAtTime(this.bgmGain.gain.value || 0.0001, this.audioContext.currentTime);
-      this.bgmGain.gain.exponentialRampToValueAtTime(0.0001, this.audioContext.currentTime + 0.08);
-      this.bgmGain.disconnect();
+    if (!this.bgmSource) {
+      this.activeBgmPath = null;
+      return;
     }
 
-    this.bgmGain = null;
+    this.bgmSource.stop();
+    this.bgmSource.clip = null;
+    this.bgmSource.volume = 0;
+    this.activeBgmPath = null;
   }
 }

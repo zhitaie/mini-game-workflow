@@ -120,6 +120,14 @@ interface AmbientSnowParticle {
   speed: number;
 }
 
+interface CoinBurstEffect {
+  node: Node;
+  age: number;
+  life: number;
+  x: number;
+  y: number;
+}
+
 interface RoadsideDecoration {
   node: Node;
   side: -1 | 1;
@@ -189,6 +197,7 @@ export class SkiEndlessGameScene extends Component {
   private entities: TrackEntity[] = [];
   private stripes: StripeVisual[] = [];
   private snowParticles: AmbientSnowParticle[] = [];
+  private coinBursts: CoinBurstEffect[] = [];
   private roadsideDecorations: RoadsideDecoration[] = [];
   private phase: ScenePhase = 'home';
 
@@ -248,7 +257,7 @@ export class SkiEndlessGameScene extends Component {
     const runtimeSession = SkiRuntimeSessionStore.get();
 
     if (!runtimeSession) {
-      this.renderFatal('Runtime session missing. Return to Boot scene first.');
+      this.renderFatal('运行时会话不存在，请先返回 Boot 场景初始化。');
       return;
     }
 
@@ -258,6 +267,8 @@ export class SkiEndlessGameScene extends Component {
     this.loadPreferences();
     this.audioDirector.setAudioEnabled(this.preferences.audioEnabled);
     this.ensureSceneNodes();
+    this.audioDirector.attachHost(this.canvasNode ?? this.node);
+    this.audioDirector.preload();
     this.applyPortraitPresentation();
     this.applyDefaultLayout();
     this.buildTrackVisuals();
@@ -279,6 +290,7 @@ export class SkiEndlessGameScene extends Component {
   update(deltaTime: number): void {
     this.animationClock += deltaTime;
     this.updateTrackVisuals(deltaTime);
+    this.updateCoinBursts(deltaTime);
 
     if (!this.runState || this.phase !== 'running' || this.runState.finished) {
       return;
@@ -288,7 +300,7 @@ export class SkiEndlessGameScene extends Component {
     const difficulty = this.getDifficultyProfile(run);
     if (run.stage !== difficulty.stage) {
       run.stage = difficulty.stage;
-      this.resultLabel && (this.resultLabel.string = `${difficulty.label}\nThe slope is shifting.`);
+      this.resultLabel && (this.resultLabel.string = `${difficulty.label}\n赛道节奏正在变化。`);
     }
 
     run.speed = Math.min(difficulty.speedCap, run.speed + deltaTime * difficulty.acceleration);
@@ -475,6 +487,7 @@ export class SkiEndlessGameScene extends Component {
     this.entities = [];
     this.stripes = [];
     this.snowParticles = [];
+    this.coinBursts = [];
     this.laneGuideNodes = [];
     this.roadsideDecorations = [];
 
@@ -962,7 +975,12 @@ export class SkiEndlessGameScene extends Component {
       return;
     }
 
+    if (this.runState.laneIndex === laneIndex) {
+      return;
+    }
+
     this.runState.laneIndex = laneIndex;
+    this.audioDirector.playLaneShift();
     this.updateSkierVisual(laneIndex);
     this.renderHud();
   }
@@ -1113,9 +1131,11 @@ export class SkiEndlessGameScene extends Component {
         if (isSameLane && isNearPlayer) {
           if (entity.kind === 'coin') {
             this.runState.coinsCollected += 1;
+            const burstPosition = entity.node.getPosition();
             entity.node.destroy();
             this.resultLabel && (this.resultLabel.string = `吃到金币\n本局金币 ${String(this.runState.coinsCollected)}`);
             this.audioDirector.playCoin();
+            this.spawnCoinBurst(burstPosition.x, burstPosition.y);
             continue;
           }
 
@@ -1635,6 +1655,75 @@ export class SkiEndlessGameScene extends Component {
   private clearEntities(): void {
     this.entities.forEach((entity) => entity.node.destroy());
     this.entities = [];
+    this.coinBursts.forEach((effect) => effect.node.destroy());
+    this.coinBursts = [];
+  }
+
+  private spawnCoinBurst(x: number, y: number): void {
+    if (!this.itemRoot) {
+      return;
+    }
+
+    const node = this.createGraphicsNode(`CoinBurst-${Date.now()}`, this.itemRoot, 8);
+    this.coinBursts.push({
+      node,
+      age: 0,
+      life: 0.42,
+      x,
+      y
+    });
+  }
+
+  private updateCoinBursts(deltaTime: number): void {
+    if (this.coinBursts.length === 0) {
+      return;
+    }
+
+    const survivors: CoinBurstEffect[] = [];
+
+    for (const effect of this.coinBursts) {
+      effect.age += deltaTime;
+      if (effect.age >= effect.life) {
+        effect.node.destroy();
+        continue;
+      }
+
+      this.renderCoinBurst(effect);
+      survivors.push(effect);
+    }
+
+    this.coinBursts = survivors;
+  }
+
+  private renderCoinBurst(effect: CoinBurstEffect): void {
+    const graphics = this.ensureGraphics(effect.node);
+    const progress = effect.age / effect.life;
+    const eased = 1 - Math.pow(1 - progress, 2);
+    const alpha = Math.max(0, 1 - progress);
+    const radius = 12 + eased * 44;
+    const sparkleRadius = 18 + eased * 52;
+
+    effect.node.setPosition(effect.x, effect.y + eased * 36, 0);
+    effect.node.setScale(1 - progress * 0.08, 1 - progress * 0.08, 1);
+
+    graphics.clear();
+    graphics.strokeColor = new Color(255, 229, 120, Math.round(228 * alpha));
+    graphics.lineWidth = 4;
+    graphics.circle(0, 0, radius);
+    graphics.stroke();
+
+    graphics.fillColor = new Color(255, 247, 196, Math.round(168 * alpha));
+    graphics.circle(0, 0, 8 + eased * 8);
+    graphics.fill();
+
+    for (let index = 0; index < 6; index += 1) {
+      const angle = (Math.PI * 2 * index) / 6 + effect.age * 9;
+      const px = Math.cos(angle) * sparkleRadius;
+      const py = Math.sin(angle) * sparkleRadius * 0.72;
+      graphics.fillColor = new Color(255, 209, 69, Math.round(210 * alpha));
+      graphics.circle(px, py, 4 + (1 - progress) * 3);
+      graphics.fill();
+    }
   }
 
   private formatLeaderboard(items: SkiLeaderboardEntry[], currentUser: SkiLeaderboardEntry | null): string {
