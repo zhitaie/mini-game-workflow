@@ -55,15 +55,18 @@ type ButtonActionId =
   | 'toggle_assist'
   | 'toggle_coach';
 
-const PLAYER_Y = -420;
-const SPAWN_Y = 720;
-const DESPAWN_Y = -760;
-const LANE_BASE_X = 118;
-const TRACK_HALF_WIDTH_TOP = 150;
-const TRACK_HALF_WIDTH_BOTTOM = 320;
+const PLAYER_Y = -430;
+const TRACK_HORIZON_Y = 156;
+const TRACK_NEAR_Y = -690;
+const TRACK_HALF_WIDTH_FAR = 56;
+const TRACK_HALF_WIDTH_NEAR = 308;
+const LANE_SPREAD_FAR = 34;
+const LANE_SPREAD_NEAR = 178;
+const PLAYER_COLLISION_DEPTH = 0.78;
 const DISTANCE_FACTOR = 12;
-const ENTITY_MOVE_FACTOR = 104;
-const STRIPE_MOVE_FACTOR = 88;
+const ENTITY_DEPTH_FACTOR = 0.066;
+const STRIPE_DEPTH_FACTOR = 0.058;
+const ROADSIDE_DEPTH_FACTOR = 0.054;
 const MIN_SPAWN_INTERVAL = 0.52;
 const PREFERENCES_STORAGE_KEY = 'ski-endless-local-preferences-v1';
 
@@ -99,7 +102,7 @@ interface TrackEntity {
   kind: EntityKind;
   obstacleType?: ObstacleType;
   laneIndex: LaneIndex;
-  y: number;
+  depth: number;
   node: Node;
   colliderRadius: number;
   pulseOffset: number;
@@ -107,7 +110,7 @@ interface TrackEntity {
 
 interface StripeVisual {
   node: Node;
-  y: number;
+  depth: number;
 }
 
 interface AmbientSnowParticle {
@@ -115,6 +118,15 @@ interface AmbientSnowParticle {
   x: number;
   y: number;
   speed: number;
+}
+
+interface RoadsideDecoration {
+  node: Node;
+  side: -1 | 1;
+  obstacleType: 'tree' | 'rock';
+  depth: number;
+  lateralOffset: number;
+  pulseOffset: number;
 }
 
 interface UIButton {
@@ -177,6 +189,7 @@ export class SkiEndlessGameScene extends Component {
   private entities: TrackEntity[] = [];
   private stripes: StripeVisual[] = [];
   private snowParticles: AmbientSnowParticle[] = [];
+  private roadsideDecorations: RoadsideDecoration[] = [];
   private phase: ScenePhase = 'home';
 
   private canvasNode: Node | null = null;
@@ -461,6 +474,7 @@ export class SkiEndlessGameScene extends Component {
     this.stripes = [];
     this.snowParticles = [];
     this.laneGuideNodes = [];
+    this.roadsideDecorations = [];
 
     if (this.visualFrames.background) {
       this.createBackgroundSprite(this.backgroundRoot, this.visualFrames.background);
@@ -507,42 +521,58 @@ export class SkiEndlessGameScene extends Component {
       ]);
     }
 
+    const lowerSnowfield = this.createGraphicsNode('LowerSnowfield', this.backgroundRoot, -1);
+    this.drawRect(lowerSnowfield, 0, -280, 840, 980, new Color(226, 239, 248, 255));
+
+    const sideBanks = this.createGraphicsNode('SideBanks', this.backgroundRoot, -1);
+    this.drawSideBanks(sideBanks);
+
     const trackNode = this.createGraphicsNode('Track', this.backgroundRoot, 0);
     const trackGraphics = this.ensureGraphics(trackNode);
     trackGraphics.clear();
-    trackGraphics.fillColor = this.visualFrames.background
-      ? new Color(244, 249, 255, 126)
-      : new Color(238, 245, 250, 255);
-    trackGraphics.moveTo(-TRACK_HALF_WIDTH_TOP, 260);
-    trackGraphics.lineTo(TRACK_HALF_WIDTH_TOP, 260);
-    trackGraphics.lineTo(TRACK_HALF_WIDTH_BOTTOM, -640);
-    trackGraphics.lineTo(-TRACK_HALF_WIDTH_BOTTOM, -640);
+    trackGraphics.fillColor = new Color(241, 247, 252, 255);
+    trackGraphics.moveTo(-TRACK_HALF_WIDTH_FAR, TRACK_HORIZON_Y);
+    trackGraphics.lineTo(TRACK_HALF_WIDTH_FAR, TRACK_HORIZON_Y);
+    trackGraphics.lineTo(TRACK_HALF_WIDTH_NEAR, TRACK_NEAR_Y);
+    trackGraphics.lineTo(-TRACK_HALF_WIDTH_NEAR, TRACK_NEAR_Y);
     trackGraphics.close();
     trackGraphics.fill();
+
+    const trackShadow = this.createGraphicsNode('TrackShadow', this.backgroundRoot, 1);
+    const shadowGraphics = this.ensureGraphics(trackShadow);
+    shadowGraphics.clear();
+    shadowGraphics.fillColor = new Color(180, 203, 228, 70);
+    shadowGraphics.moveTo(-TRACK_HALF_WIDTH_FAR - 12, TRACK_HORIZON_Y + 12);
+    shadowGraphics.lineTo(TRACK_HALF_WIDTH_FAR + 12, TRACK_HORIZON_Y + 12);
+    shadowGraphics.lineTo(TRACK_HALF_WIDTH_NEAR + 28, TRACK_NEAR_Y - 8);
+    shadowGraphics.lineTo(-TRACK_HALF_WIDTH_NEAR - 28, TRACK_NEAR_Y - 8);
+    shadowGraphics.close();
+    shadowGraphics.fill();
 
     const edgeGraphics = this.createGraphicsNode('TrackEdge', this.backgroundRoot, 1);
     const edge = this.ensureGraphics(edgeGraphics);
     edge.clear();
-    edge.strokeColor = this.visualFrames.background
-      ? new Color(234, 247, 255, 184)
-      : new Color(208, 222, 232, 255);
+    edge.strokeColor = new Color(214, 231, 246, 255);
     edge.lineWidth = 6;
-    edge.moveTo(-TRACK_HALF_WIDTH_TOP, 260);
-    edge.lineTo(-TRACK_HALF_WIDTH_BOTTOM, -640);
-    edge.moveTo(TRACK_HALF_WIDTH_TOP, 260);
-    edge.lineTo(TRACK_HALF_WIDTH_BOTTOM, -640);
+    edge.moveTo(-TRACK_HALF_WIDTH_FAR, TRACK_HORIZON_Y);
+    edge.lineTo(-TRACK_HALF_WIDTH_NEAR, TRACK_NEAR_Y);
+    edge.moveTo(TRACK_HALF_WIDTH_FAR, TRACK_HORIZON_Y);
+    edge.lineTo(TRACK_HALF_WIDTH_NEAR, TRACK_NEAR_Y);
     edge.stroke();
 
-    for (let index = 0; index < 4; index += 1) {
+    const grooveGraphics = this.createGraphicsNode('TrackGrooves', this.backgroundRoot, 2);
+    this.drawTrackGrooves(grooveGraphics);
+
+    for (let index = 0; index < 5; index += 1) {
       const stripeNode = this.createGraphicsNode(`Stripe-${index}`, this.backgroundRoot, 2);
       const graphic = this.ensureGraphics(stripeNode);
       graphic.clear();
-      graphic.fillColor = new Color(255, 255, 255, this.visualFrames.background ? 74 : 92);
+      graphic.fillColor = new Color(255, 255, 255, 88);
       graphic.roundRect(-42, -18, 84, 36, 18);
       graphic.fill();
       this.stripes.push({
         node: stripeNode,
-        y: 200 - index * 220
+        depth: 0.08 + index * 0.18
       });
     }
 
@@ -952,18 +982,18 @@ export class SkiEndlessGameScene extends Component {
     for (let index = 0; index < obstacleCount; index += 1) {
       const lane = lanes[index];
       const obstacleType = profile.obstaclePool[Math.floor(Math.random() * profile.obstaclePool.length)] ?? 'tree';
-      this.spawnEntity('obstacle', lane, SPAWN_Y + index * 34, obstacleType);
+      this.spawnEntity('obstacle', lane, 0.02 + index * 0.018, obstacleType);
     }
 
     const safeLanes = lanes.filter((lane) => !lanes.slice(0, obstacleCount).includes(lane));
     const primaryCoinLane = safeLanes[0];
     if (primaryCoinLane !== undefined && Math.random() < profile.coinChance) {
-      this.spawnEntity('coin', primaryCoinLane, SPAWN_Y + 78);
+      this.spawnEntity('coin', primaryCoinLane, 0.09);
     }
 
     const bonusCoinLane = safeLanes[1];
     if (bonusCoinLane !== undefined && Math.random() < profile.bonusCoinChance) {
-      this.spawnEntity('coin', bonusCoinLane, SPAWN_Y + 126);
+      this.spawnEntity('coin', bonusCoinLane, 0.15);
     }
   }
 
@@ -1025,7 +1055,7 @@ export class SkiEndlessGameScene extends Component {
     };
   }
 
-  private spawnEntity(kind: EntityKind, laneIndex: LaneIndex, y: number, obstacleType: ObstacleType = 'tree'): void {
+  private spawnEntity(kind: EntityKind, laneIndex: LaneIndex, depth: number, obstacleType: ObstacleType = 'tree'): void {
     if (!this.itemRoot) {
       return;
     }
@@ -1055,7 +1085,7 @@ export class SkiEndlessGameScene extends Component {
       kind,
       obstacleType: kind === 'obstacle' ? obstacleType : undefined,
       laneIndex,
-      y,
+      depth,
       node,
       colliderRadius: kind === 'coin' ? 38 : obstacleType === 'gate' ? 60 : 72,
       pulseOffset: Math.random() * Math.PI * 2
@@ -1064,13 +1094,13 @@ export class SkiEndlessGameScene extends Component {
   }
 
   private updateEntities(deltaTime: number, speed: number): void {
-    const moveDelta = speed * deltaTime * ENTITY_MOVE_FACTOR;
+    const moveDelta = speed * deltaTime * ENTITY_DEPTH_FACTOR;
     const survivors: TrackEntity[] = [];
 
     for (const entity of this.entities) {
-      entity.y -= moveDelta;
+      entity.depth += moveDelta;
 
-      if (entity.y < DESPAWN_Y) {
+      if (entity.depth > 1.08) {
         entity.node.destroy();
         continue;
       }
@@ -1079,7 +1109,10 @@ export class SkiEndlessGameScene extends Component {
 
       if (this.runState && this.phase === 'running' && !this.runState.finished) {
         const isSameLane = entity.laneIndex === this.runState.laneIndex;
-        const isNearPlayer = Math.abs(entity.y - PLAYER_Y) < entity.colliderRadius;
+        const entityY = this.projectDepthToY(entity.depth);
+        const isNearPlayer =
+          Math.abs(entity.depth - PLAYER_COLLISION_DEPTH) < (entity.kind === 'coin' ? 0.05 : 0.06) ||
+          Math.abs(entityY - PLAYER_Y) < (entity.kind === 'coin' ? 34 : 52);
 
         if (isSameLane && isNearPlayer) {
           if (entity.kind === 'coin') {
@@ -1156,11 +1189,13 @@ export class SkiEndlessGameScene extends Component {
       this.runState.reviveUsed = true;
       this.runState.speed = Math.max(this.runState.baseSpeed, this.runState.speed * 0.72);
       this.entities.forEach((entity) => {
-        if (Math.abs(entity.y - PLAYER_Y) < 140) {
+        if (Math.abs(this.projectDepthToY(entity.depth) - PLAYER_Y) < 140) {
           entity.node.destroy();
         }
       });
-      this.entities = this.entities.filter((entity) => Math.abs(entity.y - PLAYER_Y) >= 140);
+      this.entities = this.entities.filter(
+        (entity) => Math.abs(this.projectDepthToY(entity.depth) - PLAYER_Y) >= 140
+      );
       this.resultPanel && (this.resultPanel.active = false);
       this.resultLabel && (this.resultLabel.string = `Revived\nverification=${verification.verificationId}`);
       this.hudPanelRoot && (this.hudPanelRoot.active = true);
@@ -1206,23 +1241,38 @@ export class SkiEndlessGameScene extends Component {
       return;
     }
 
-    const stripeDelta = this.runState.speed * deltaTime * STRIPE_MOVE_FACTOR;
-    const cycleHeight = 680;
+    const stripeDelta = this.runState.speed * deltaTime * STRIPE_DEPTH_FACTOR;
 
     for (const stripe of this.stripes) {
-      stripe.y -= stripeDelta;
-      if (stripe.y < -310) {
-        stripe.y += cycleHeight;
+      stripe.depth += stripeDelta;
+      if (stripe.depth > 1.02) {
+        stripe.depth -= 0.92;
       }
 
-      const progress = this.getProgressFromY(stripe.y);
-      const halfWidth = this.interpolate(TRACK_HALF_WIDTH_TOP - 40, TRACK_HALF_WIDTH_BOTTOM - 70, progress);
-      stripe.node.setPosition(0, stripe.y, 0);
-      stripe.node.setScale(halfWidth / 120, 1 + progress * 1.8, 1);
+      const progress = this.getDepthCurve(stripe.depth);
+      const halfWidth = this.interpolate(TRACK_HALF_WIDTH_FAR - 12, TRACK_HALF_WIDTH_NEAR - 54, progress);
+      const y = this.projectDepthToY(stripe.depth);
+      stripe.node.setPosition(0, y, 0);
+      stripe.node.setScale(halfWidth / 120, 0.72 + progress * 2.1, 1);
+      stripe.node.angle = Math.sin(this.animationClock * 0.9 + stripe.depth * 6) * 0.8;
+    }
+
+    const roadsideDelta = this.runState.speed * deltaTime * ROADSIDE_DEPTH_FACTOR;
+    for (const decoration of this.roadsideDecorations) {
+      decoration.depth += roadsideDelta;
+      if (decoration.depth > 1.08) {
+        decoration.depth = 0.04 + Math.random() * 0.1;
+        decoration.obstacleType = Math.random() < 0.78 ? 'tree' : 'rock';
+        decoration.lateralOffset = 56 + Math.random() * 68;
+        decoration.pulseOffset = Math.random() * Math.PI * 2;
+        this.renderObstacleNode(decoration.node, decoration.obstacleType, 'decor');
+      }
+
+      this.positionRoadsideDecoration(decoration);
     }
 
     for (const particle of this.snowParticles) {
-      particle.y -= particle.speed * deltaTime;
+      particle.y -= (particle.speed + this.runState.speed * 3.8) * deltaTime;
       if (particle.y < -380) {
         particle.y = 390 + Math.random() * 120;
       }
@@ -1575,15 +1625,16 @@ export class SkiEndlessGameScene extends Component {
   }
 
   private positionEntity(entity: TrackEntity): void {
-    const progress = this.getProgressFromY(entity.y);
-    const laneSpread = this.interpolate(0.72, 1.08, progress);
+    const progress = this.getDepthCurve(entity.depth);
+    const laneSpread = this.interpolate(LANE_SPREAD_FAR, LANE_SPREAD_NEAR, progress);
     const x = this.getLaneX(entity.laneIndex, laneSpread);
-    const scale = this.interpolate(0.62, 1.35, progress);
+    const y = this.projectDepthToY(entity.depth);
+    const scale = this.interpolate(0.28, 1.32, progress);
     const pulse = Math.sin(this.animationClock * 7.2 + entity.pulseOffset);
     const bob = entity.kind === 'coin' ? pulse * (4 + progress * 6) : 0;
     const visualScale = entity.kind === 'coin' ? scale * (1 + pulse * 0.08) : scale;
 
-    entity.node.setPosition(x, entity.y + bob, 0);
+    entity.node.setPosition(x, y + bob, 0);
     entity.node.setScale(visualScale, visualScale, 1);
     entity.node.angle =
       entity.kind === 'obstacle' && entity.obstacleType === 'tree'
@@ -1594,12 +1645,16 @@ export class SkiEndlessGameScene extends Component {
   }
 
   private getLaneX(laneIndex: LaneIndex, spread: number): number {
-    return laneIndex * LANE_BASE_X * spread;
+    return laneIndex * spread;
   }
 
-  private getProgressFromY(y: number): number {
-    const raw = (SPAWN_Y - y) / (SPAWN_Y - PLAYER_Y + 90);
-    return Math.max(0, Math.min(1, raw));
+  private getDepthCurve(depth: number): number {
+    const clamped = Math.max(0, Math.min(1, depth));
+    return Math.pow(clamped, 1.65);
+  }
+
+  private projectDepthToY(depth: number): number {
+    return this.interpolate(TRACK_HORIZON_Y, TRACK_NEAR_Y, this.getDepthCurve(depth));
   }
 
   private interpolate(start: number, end: number, progress: number): number {
@@ -1900,13 +1955,52 @@ export class SkiEndlessGameScene extends Component {
     graphics.fill();
   }
 
+  private drawSideBanks(node: Node): void {
+    const graphics = this.ensureGraphics(node);
+    graphics.clear();
+    graphics.fillColor = new Color(236, 245, 251, 255);
+    graphics.moveTo(-420, TRACK_HORIZON_Y + 42);
+    graphics.lineTo(-TRACK_HALF_WIDTH_FAR - 18, TRACK_HORIZON_Y + 8);
+    graphics.lineTo(-TRACK_HALF_WIDTH_NEAR - 18, TRACK_NEAR_Y - 6);
+    graphics.lineTo(-420, TRACK_NEAR_Y - 6);
+    graphics.close();
+    graphics.fill();
+
+    graphics.moveTo(420, TRACK_HORIZON_Y + 42);
+    graphics.lineTo(TRACK_HALF_WIDTH_FAR + 18, TRACK_HORIZON_Y + 8);
+    graphics.lineTo(TRACK_HALF_WIDTH_NEAR + 18, TRACK_NEAR_Y - 6);
+    graphics.lineTo(420, TRACK_NEAR_Y - 6);
+    graphics.close();
+    graphics.fill();
+  }
+
+  private drawTrackGrooves(node: Node): void {
+    const graphics = this.ensureGraphics(node);
+    graphics.clear();
+    graphics.strokeColor = new Color(189, 216, 238, 212);
+    graphics.lineWidth = 4;
+    graphics.moveTo(-14, TRACK_HORIZON_Y);
+    graphics.lineTo(-54, TRACK_NEAR_Y);
+    graphics.moveTo(14, TRACK_HORIZON_Y);
+    graphics.lineTo(54, TRACK_NEAR_Y);
+    graphics.stroke();
+
+    graphics.strokeColor = new Color(255, 255, 255, 116);
+    graphics.lineWidth = 2;
+    graphics.moveTo(-44, TRACK_HORIZON_Y + 8);
+    graphics.lineTo(-124, TRACK_NEAR_Y);
+    graphics.moveTo(44, TRACK_HORIZON_Y + 8);
+    graphics.lineTo(124, TRACK_NEAR_Y);
+    graphics.stroke();
+  }
+
   private drawLaneGuide(node: Node, direction: -1 | 1): void {
     const graphics = this.ensureGraphics(node);
     graphics.clear();
     graphics.strokeColor = new Color(255, 255, 255, 55);
     graphics.lineWidth = 4;
-    graphics.moveTo(direction * 42, 250);
-    graphics.lineTo(direction * 134, -640);
+    graphics.moveTo(direction * 18, TRACK_HORIZON_Y);
+    graphics.lineTo(direction * 118, TRACK_NEAR_Y);
     graphics.stroke();
   }
 
@@ -1935,18 +2029,30 @@ export class SkiEndlessGameScene extends Component {
       return;
     }
 
-    for (let index = 0; index < 6; index += 1) {
+    for (let index = 0; index < 10; index += 1) {
       const leftTree = this.createVisualNode(`DecorTreeLeft-${index}`, this.backgroundRoot, 4);
       const rightTree = this.createVisualNode(`DecorTreeRight-${index}`, this.backgroundRoot, 4);
-      const y = 270 - index * 166;
-      const scale = 0.8 + index * 0.08;
+      this.roadsideDecorations.push({
+        node: leftTree,
+        side: -1,
+        obstacleType: Math.random() < 0.82 ? 'tree' : 'rock',
+        depth: (index / 10) * 0.98,
+        lateralOffset: 54 + Math.random() * 62,
+        pulseOffset: Math.random() * Math.PI * 2
+      });
+      this.roadsideDecorations.push({
+        node: rightTree,
+        side: 1,
+        obstacleType: Math.random() < 0.82 ? 'tree' : 'rock',
+        depth: ((index + 0.45) / 10) * 0.98,
+        lateralOffset: 54 + Math.random() * 62,
+        pulseOffset: Math.random() * Math.PI * 2
+      });
+    }
 
-      this.renderObstacleNode(leftTree, 'tree', 'decor');
-      this.renderObstacleNode(rightTree, 'tree', 'decor');
-      leftTree.setPosition(-355 + index * 10, y, 0);
-      rightTree.setPosition(355 - index * 10, y + 40, 0);
-      leftTree.setScale(scale, scale, 1);
-      rightTree.setScale(scale * 0.95, scale * 0.95, 1);
+    for (const decoration of this.roadsideDecorations) {
+      this.renderObstacleNode(decoration.node, decoration.obstacleType, 'decor');
+      this.positionRoadsideDecoration(decoration);
     }
 
     const snowDriftLeft = this.createGraphicsNode('SnowDriftLeft', this.backgroundRoot, 5);
@@ -2036,6 +2142,22 @@ export class SkiEndlessGameScene extends Component {
     graphics.fill();
     graphics.circle(centerX + (centerX < 0 ? 55 : -55), -220, 84);
     graphics.fill();
+  }
+
+  private positionRoadsideDecoration(decoration: RoadsideDecoration): void {
+    const progress = this.getDepthCurve(decoration.depth);
+    const trackEdgeX = this.interpolate(TRACK_HALF_WIDTH_FAR + 26, TRACK_HALF_WIDTH_NEAR + 34, progress);
+    const x = decoration.side * (trackEdgeX + decoration.lateralOffset * (0.55 + progress * 0.75));
+    const y = this.projectDepthToY(decoration.depth) + this.interpolate(24, -10, progress);
+    const scaleBase =
+      decoration.obstacleType === 'rock'
+        ? this.interpolate(0.34, 1.22, progress)
+        : this.interpolate(0.42, 1.46, progress);
+    const sway = Math.sin(this.animationClock * 3.4 + decoration.pulseOffset) * 1.2;
+
+    decoration.node.setPosition(x, y, 0);
+    decoration.node.setScale(scaleBase, scaleBase, 1);
+    decoration.node.angle = decoration.obstacleType === 'tree' ? sway : 0;
   }
 
   private async loadVisualAssets(): Promise<void> {
