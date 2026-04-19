@@ -31,17 +31,22 @@ type LaneIndex = -1 | 0 | 1;
 type EntityKind = 'obstacle' | 'coin';
 type ObstacleType = 'tree' | 'rock' | 'gate';
 type DifficultyStage = 'warmup' | 'flow' | 'rush' | 'whiteout';
-type ScenePhase = 'home' | 'rank' | 'notice' | 'running' | 'result';
+type ScenePhase = 'home' | 'rank' | 'notice' | 'settings' | 'running' | 'result';
 type ButtonActionId =
   | 'start_run'
   | 'view_rank'
   | 'view_notice'
+  | 'view_settings'
   | 'revive'
   | 'double_coin'
   | 'restart'
   | 'back_home'
   | 'close_rank'
-  | 'close_notice';
+  | 'close_notice'
+  | 'close_settings'
+  | 'toggle_snow_fx'
+  | 'toggle_assist'
+  | 'toggle_coach';
 
 const PLAYER_Y = -235;
 const SPAWN_Y = 470;
@@ -53,6 +58,7 @@ const DISTANCE_FACTOR = 12;
 const ENTITY_MOVE_FACTOR = 104;
 const STRIPE_MOVE_FACTOR = 72;
 const MIN_SPAWN_INTERVAL = 0.52;
+const PREFERENCES_STORAGE_KEY = 'ski-endless-local-preferences-v1';
 
 interface ActiveRunState {
   mode: SkiModeKey;
@@ -123,6 +129,12 @@ interface UIStatCard {
   valueLabel: Label;
 }
 
+interface SkiLocalPreferences {
+  snowFxEnabled: boolean;
+  assistLinesEnabled: boolean;
+  coachTipsEnabled: boolean;
+}
+
 @ccclass('SkiEndlessGameScene')
 export class SkiEndlessGameScene extends Component {
   @property(Label)
@@ -156,6 +168,7 @@ export class SkiEndlessGameScene extends Component {
   private homePanel: Node | null = null;
   private rankPanel: Node | null = null;
   private noticePanel: Node | null = null;
+  private settingsPanel: Node | null = null;
   private resultPanel: Node | null = null;
   private homeTitleLabel: Label | null = null;
   private homeInfoLabel: Label | null = null;
@@ -165,6 +178,8 @@ export class SkiEndlessGameScene extends Component {
   private rankInfoLabel: Label | null = null;
   private noticeTitleLabel: Label | null = null;
   private noticeInfoLabel: Label | null = null;
+  private settingsTitleLabel: Label | null = null;
+  private settingsInfoLabel: Label | null = null;
   private resultTitleLabel: Label | null = null;
   private resultInfoLabel: Label | null = null;
   private hudPanelRoot: Node | null = null;
@@ -172,10 +187,17 @@ export class SkiEndlessGameScene extends Component {
   private homeButtons: UIButton[] = [];
   private rankButtons: UIButton[] = [];
   private noticeButtons: UIButton[] = [];
+  private settingsButtons: UIButton[] = [];
   private resultButtons: UIButton[] = [];
   private hudCards: UIStatCard[] = [];
   private homeCards: UIStatCard[] = [];
   private resultCards: UIStatCard[] = [];
+  private laneGuideNodes: Node[] = [];
+  private preferences: SkiLocalPreferences = {
+    snowFxEnabled: true,
+    assistLinesEnabled: true,
+    coachTipsEnabled: true
+  };
 
   start(): void {
     const runtimeSession = SkiRuntimeSessionStore.get();
@@ -188,6 +210,7 @@ export class SkiEndlessGameScene extends Component {
     this.sessionUserId = runtimeSession.session.user.id;
     this.controller = new SkiEndlessPrototypeController(runtimeSession.runtime);
     this.savedCoinBank = this.controller.getSnapshot().coins;
+    this.loadPreferences();
     this.ensureSceneNodes();
     this.applyDefaultLayout();
     this.buildTrackVisuals();
@@ -264,7 +287,7 @@ export class SkiEndlessGameScene extends Component {
       }
     }
 
-    if (this.phase === 'rank' || this.phase === 'notice') {
+    if (this.phase === 'rank' || this.phase === 'notice' || this.phase === 'settings') {
       switch (event.keyCode) {
         case KeyCode.KEY_H:
         case KeyCode.ESCAPE:
@@ -327,6 +350,13 @@ export class SkiEndlessGameScene extends Component {
       return;
     }
 
+    if (this.phase === 'settings') {
+      if (this.tryHandleButtons(location, this.settingsButtons)) {
+        return;
+      }
+      return;
+    }
+
     if (!this.runState || this.busy) {
       return;
     }
@@ -376,6 +406,7 @@ export class SkiEndlessGameScene extends Component {
     this.entities = [];
     this.stripes = [];
     this.snowParticles = [];
+    this.laneGuideNodes = [];
 
     const skyNode = this.createGraphicsNode('Sky', this.backgroundRoot, -5);
     this.drawRect(skyNode, 0, 150, 1280, 620, new Color(122, 181, 235, 255));
@@ -455,6 +486,7 @@ export class SkiEndlessGameScene extends Component {
     const rightGuide = this.createGraphicsNode('LaneGuideRight', this.backgroundRoot, 3);
     this.drawLaneGuide(leftGuide, -1);
     this.drawLaneGuide(rightGuide, 1);
+    this.laneGuideNodes.push(leftGuide, rightGuide);
 
     this.buildSideDecorations();
     this.buildAmbientSnow();
@@ -466,6 +498,8 @@ export class SkiEndlessGameScene extends Component {
     if (skierTransform) {
       skierTransform.setContentSize(120, 120);
     }
+
+    this.applyPreferenceVisuals();
   }
 
   private buildPanels(): void {
@@ -477,7 +511,8 @@ export class SkiEndlessGameScene extends Component {
     this.homePanel = this.ensureChildNode(this.overlayRoot, 'HomePanel', 3);
     this.rankPanel = this.ensureChildNode(this.overlayRoot, 'RankPanel', 4);
     this.noticePanel = this.ensureChildNode(this.overlayRoot, 'NoticePanel', 5);
-    this.resultPanel = this.ensureChildNode(this.overlayRoot, 'ResultPanel', 6);
+    this.settingsPanel = this.ensureChildNode(this.overlayRoot, 'SettingsPanel', 6);
+    this.resultPanel = this.ensureChildNode(this.overlayRoot, 'ResultPanel', 7);
 
     this.hudPanelRoot.removeAllChildren();
     const homeBackground = this.ensureGraphics(this.homePanel);
@@ -486,6 +521,8 @@ export class SkiEndlessGameScene extends Component {
     this.drawPanelBackground(rankBackground, 0, 28, 650, 540, new Color(11, 23, 39, 236));
     const noticeBackground = this.ensureGraphics(this.noticePanel);
     this.drawPanelBackground(noticeBackground, 0, 28, 650, 540, new Color(11, 23, 39, 236));
+    const settingsBackground = this.ensureGraphics(this.settingsPanel);
+    this.drawPanelBackground(settingsBackground, 0, 28, 650, 540, new Color(11, 23, 39, 236));
 
     const resultBackground = this.ensureGraphics(this.resultPanel);
     this.drawPanelBackground(resultBackground, 0, -6, 650, 438, new Color(14, 22, 36, 234));
@@ -498,6 +535,8 @@ export class SkiEndlessGameScene extends Component {
     this.rankInfoLabel = this.ensureLabelNode(this.rankPanel, 'RankInfo', 24);
     this.noticeTitleLabel = this.ensureLabelNode(this.noticePanel, 'NoticeTitle', 44);
     this.noticeInfoLabel = this.ensureLabelNode(this.noticePanel, 'NoticeInfo', 24);
+    this.settingsTitleLabel = this.ensureLabelNode(this.settingsPanel, 'SettingsTitle', 44);
+    this.settingsInfoLabel = this.ensureLabelNode(this.settingsPanel, 'SettingsInfo', 24);
     this.resultTitleLabel = this.ensureLabelNode(this.resultPanel, 'ResultTitle', 44);
     this.resultInfoLabel = this.ensureLabelNode(this.resultPanel, 'ResultInfo', 26);
 
@@ -509,6 +548,8 @@ export class SkiEndlessGameScene extends Component {
     this.configureLabelNode(this.rankInfoLabel, new Vec3(0, 4, 0), HorizontalTextAlignment.LEFT, 560, 330, 24, 30);
     this.configureLabelNode(this.noticeTitleLabel, new Vec3(0, 186, 0), HorizontalTextAlignment.CENTER, 540, 70, 44, 50);
     this.configureLabelNode(this.noticeInfoLabel, new Vec3(0, 4, 0), HorizontalTextAlignment.LEFT, 560, 330, 24, 30);
+    this.configureLabelNode(this.settingsTitleLabel, new Vec3(0, 186, 0), HorizontalTextAlignment.CENTER, 540, 70, 44, 50);
+    this.configureLabelNode(this.settingsInfoLabel, new Vec3(0, 44, 0), HorizontalTextAlignment.LEFT, 560, 180, 24, 30);
     this.configureLabelNode(this.resultTitleLabel, new Vec3(0, 140, 0), HorizontalTextAlignment.CENTER, 520, 70, 46, 52);
     this.configureLabelNode(this.resultInfoLabel, new Vec3(0, -16, 0), HorizontalTextAlignment.CENTER, 560, 150, 24, 30);
 
@@ -517,12 +558,16 @@ export class SkiEndlessGameScene extends Component {
         activeColor: new Color(20, 152, 108, 255),
         disabledColor: new Color(77, 92, 92, 255)
       }),
-      this.createButton(this.homePanel, 'RankButton', 'Leaderboard', new Vec3(-150, -184, 0), 'view_rank', { width: 220, height: 56 }, {
+      this.createButton(this.homePanel, 'RankButton', 'Leaderboard', new Vec3(-220, -184, 0), 'view_rank', { width: 180, height: 56 }, {
         activeColor: new Color(43, 87, 162, 255),
         disabledColor: new Color(77, 84, 97, 255)
       }),
-      this.createButton(this.homePanel, 'NoticeButton', 'Notice', new Vec3(150, -184, 0), 'view_notice', { width: 220, height: 56 }, {
+      this.createButton(this.homePanel, 'NoticeButton', 'Notice', new Vec3(0, -184, 0), 'view_notice', { width: 180, height: 56 }, {
         activeColor: new Color(54, 99, 173, 255),
+        disabledColor: new Color(77, 84, 97, 255)
+      }),
+      this.createButton(this.homePanel, 'SettingsButton', 'Settings', new Vec3(220, -184, 0), 'view_settings', { width: 180, height: 56 }, {
+        activeColor: new Color(83, 96, 122, 255),
         disabledColor: new Color(77, 84, 97, 255)
       })
     ];
@@ -536,6 +581,25 @@ export class SkiEndlessGameScene extends Component {
 
     this.noticeButtons = [
       this.createButton(this.noticePanel, 'NoticeBackButton', 'Back Home', new Vec3(0, -186, 0), 'close_notice', { width: 240, height: 58 }, {
+        activeColor: new Color(87, 95, 120, 255),
+        disabledColor: new Color(77, 84, 97, 255)
+      })
+    ];
+
+    this.settingsButtons = [
+      this.createButton(this.settingsPanel, 'SnowFxButton', 'Snow FX: On', new Vec3(0, -44, 0), 'toggle_snow_fx', { width: 320, height: 58 }, {
+        activeColor: new Color(52, 116, 215, 255),
+        disabledColor: new Color(77, 84, 97, 255)
+      }),
+      this.createButton(this.settingsPanel, 'AssistButton', 'Assist Lines: On', new Vec3(0, -116, 0), 'toggle_assist', { width: 320, height: 58 }, {
+        activeColor: new Color(36, 152, 126, 255),
+        disabledColor: new Color(77, 84, 97, 255)
+      }),
+      this.createButton(this.settingsPanel, 'CoachButton', 'Coach Tips: On', new Vec3(0, -188, 0), 'toggle_coach', { width: 320, height: 58 }, {
+        activeColor: new Color(221, 162, 37, 255),
+        disabledColor: new Color(77, 84, 97, 255)
+      }),
+      this.createButton(this.settingsPanel, 'SettingsBackButton', 'Back Home', new Vec3(0, -266, 0), 'close_settings', { width: 240, height: 58 }, {
         activeColor: new Color(87, 95, 120, 255),
         disabledColor: new Color(77, 84, 97, 255)
       })
@@ -588,6 +652,7 @@ export class SkiEndlessGameScene extends Component {
     this.homePanel && (this.homePanel.active = true);
     this.rankPanel && (this.rankPanel.active = false);
     this.noticePanel && (this.noticePanel.active = false);
+    this.settingsPanel && (this.settingsPanel.active = false);
     this.resultPanel && (this.resultPanel.active = false);
     this.savedCoinBank = this.controller?.getSnapshot().coins ?? this.savedCoinBank;
     this.skierNode && (this.skierNode.active = false);
@@ -610,12 +675,16 @@ export class SkiEndlessGameScene extends Component {
         `Welcome back, Rider ${String(this.sessionUserId ?? 0)}`,
         '',
         'Snowfield Endless is live.',
-        'Clean lane reads matter more than raw speed.'
+        this.preferences.coachTipsEnabled
+          ? 'Clean lane reads matter more than raw speed.'
+          : 'Pick the lane early and commit.'
       ].join('\n');
     }
 
     if (this.homeToastLabel) {
-      this.homeToastLabel.string = 'Start a run, check the live board, or read current mountain updates.';
+      this.homeToastLabel.string = this.preferences.coachTipsEnabled
+        ? 'Start a run, check the live board, review current mountain updates, or tune local slope settings.'
+        : 'Start a run, review the board, or adjust local slope settings.';
     }
 
     this.hudLabel && (this.hudLabel.string = '');
@@ -625,7 +694,9 @@ export class SkiEndlessGameScene extends Component {
         'Tap Start to hit the slope',
         '',
         'Touch left / right while playing',
-        'to switch lanes around obstacles.'
+        this.preferences.coachTipsEnabled
+          ? 'to switch lanes around obstacles.'
+          : 'to snap between lanes fast.'
       ].join('\n'));
     this.resultLabel && (this.resultLabel.string = '');
   }
@@ -660,6 +731,7 @@ export class SkiEndlessGameScene extends Component {
     this.homePanel && (this.homePanel.active = false);
     this.rankPanel && (this.rankPanel.active = false);
     this.noticePanel && (this.noticePanel.active = false);
+    this.settingsPanel && (this.settingsPanel.active = false);
     this.resultPanel && (this.resultPanel.active = false);
     this.hudPanelRoot && (this.hudPanelRoot.active = true);
     this.resultLabel && (this.resultLabel.string = 'Warm-up\nWide lanes and easy lines.');
@@ -678,6 +750,7 @@ export class SkiEndlessGameScene extends Component {
     this.runState = null;
     this.homePanel && (this.homePanel.active = false);
     this.noticePanel && (this.noticePanel.active = false);
+    this.settingsPanel && (this.settingsPanel.active = false);
     this.resultPanel && (this.resultPanel.active = false);
     this.rankPanel && (this.rankPanel.active = true);
     this.hudPanelRoot && (this.hudPanelRoot.active = false);
@@ -721,6 +794,7 @@ export class SkiEndlessGameScene extends Component {
     this.runState = null;
     this.homePanel && (this.homePanel.active = false);
     this.rankPanel && (this.rankPanel.active = false);
+    this.settingsPanel && (this.settingsPanel.active = false);
     this.resultPanel && (this.resultPanel.active = false);
     this.noticePanel && (this.noticePanel.active = true);
     this.hudPanelRoot && (this.hudPanelRoot.active = false);
@@ -752,6 +826,27 @@ export class SkiEndlessGameScene extends Component {
 
       this.noticeInfoLabel.string = `Unable to load notices.\n\n${this.formatErrorMessage(error)}`;
     }
+  }
+
+  private showSettingsScreen(): void {
+    this.phase = 'settings';
+    this.clearEntities();
+    this.runState = null;
+    this.homePanel && (this.homePanel.active = false);
+    this.rankPanel && (this.rankPanel.active = false);
+    this.noticePanel && (this.noticePanel.active = false);
+    this.resultPanel && (this.resultPanel.active = false);
+    this.settingsPanel && (this.settingsPanel.active = true);
+    this.hudPanelRoot && (this.hudPanelRoot.active = false);
+    this.skierNode && (this.skierNode.active = false);
+
+    if (this.settingsTitleLabel) {
+      this.settingsTitleLabel.string = 'SLOPE SETTINGS';
+    }
+
+    this.renderSettingsInfo();
+    this.resultLabel && (this.resultLabel.string = '');
+    this.renderHint();
   }
 
   private shiftLane(delta: -1 | 1): void {
@@ -1080,7 +1175,9 @@ export class SkiEndlessGameScene extends Component {
         'Tap Start Run to enter gameplay',
         'Swipe or tap left / right to switch lanes',
         '',
-        'Keep a clean line and hold your nerve.'
+        this.preferences.coachTipsEnabled
+          ? 'Keep a clean line, then take coins on safe reads.'
+          : 'Hold your line and commit to the gap.'
       ].join('\n');
       return;
     }
@@ -1105,6 +1202,16 @@ export class SkiEndlessGameScene extends Component {
       return;
     }
 
+    if (this.phase === 'settings') {
+      this.hintLabel.string = [
+        'Snow FX controls ambient particles.',
+        'Assist Lines show lane guides on the slope.',
+        '',
+        'Coach Tips changes tutorial-style copy.'
+      ].join('\n');
+      return;
+    }
+
     if (this.phase === 'result') {
       this.hintLabel.string = [
         'Revive once, double your coins,',
@@ -1116,12 +1223,13 @@ export class SkiEndlessGameScene extends Component {
     }
 
     this.hintLabel.string = [
-        `Pace: ${this.runState?.stage ?? 'warmup'}`,
-        'Desktop: A / D or Left / Right',
-        'Mobile: tap left / right edge',
-        '',
-        'Read the safe lane first,',
-        'then take coins on clean lines.'
+      `Pace: ${this.runState?.stage ?? 'warmup'}`,
+      'Desktop: A / D or Left / Right',
+      'Mobile: tap left / right edge',
+      '',
+      this.preferences.coachTipsEnabled
+        ? 'Read the safe lane first, then take coins on clean lines.'
+        : 'Pick the gap first, then chase the coin line.'
     ].join('\n');
   }
 
@@ -1141,6 +1249,24 @@ export class SkiEndlessGameScene extends Component {
       `Revive Used  ${String(this.runState.reviveUsed)}`,
       `Double Coins ${String(this.runState.doubleClaimed)}`
     ].join('\n');
+  }
+
+  private renderSettingsInfo(): void {
+    if (!this.settingsInfoLabel) {
+      return;
+    }
+
+    this.settingsInfoLabel.string = [
+      'Local slope presentation',
+      '',
+      `Snow FX        ${this.preferences.snowFxEnabled ? 'Enabled' : 'Disabled'}`,
+      `Assist Lines   ${this.preferences.assistLinesEnabled ? 'Enabled' : 'Disabled'}`,
+      `Coach Tips     ${this.preferences.coachTipsEnabled ? 'Enabled' : 'Disabled'}`,
+      '',
+      'These toggles only affect your local play session.'
+    ].join('\n');
+
+    this.updateSettingsButtonLabels();
   }
 
   private updateResultButtons(): void {
@@ -1227,6 +1353,9 @@ export class SkiEndlessGameScene extends Component {
       case 'view_notice':
         void this.showNoticeScreen();
         break;
+      case 'view_settings':
+        this.showSettingsScreen();
+        break;
       case 'revive':
         void this.reviveRun();
         break;
@@ -1245,9 +1374,44 @@ export class SkiEndlessGameScene extends Component {
       case 'close_notice':
         this.showHomeScreen();
         break;
+      case 'close_settings':
+        this.showHomeScreen();
+        break;
+      case 'toggle_snow_fx':
+        this.preferences.snowFxEnabled = !this.preferences.snowFxEnabled;
+        this.persistPreferences();
+        this.applyPreferenceVisuals();
+        this.renderSettingsInfo();
+        break;
+      case 'toggle_assist':
+        this.preferences.assistLinesEnabled = !this.preferences.assistLinesEnabled;
+        this.persistPreferences();
+        this.applyPreferenceVisuals();
+        this.renderSettingsInfo();
+        break;
+      case 'toggle_coach':
+        this.preferences.coachTipsEnabled = !this.preferences.coachTipsEnabled;
+        this.persistPreferences();
+        this.renderSettingsInfo();
+        this.renderHint();
+        break;
       default:
         break;
     }
+  }
+
+  private updateSettingsButtonLabels(): void {
+    const setText = (id: ButtonActionId, text: string): void => {
+      const button = this.settingsButtons.find((item) => item.id === id);
+      if (!button) {
+        return;
+      }
+      button.label.string = text;
+    };
+
+    setText('toggle_snow_fx', `Snow FX: ${this.preferences.snowFxEnabled ? 'On' : 'Off'}`);
+    setText('toggle_assist', `Assist Lines: ${this.preferences.assistLinesEnabled ? 'On' : 'Off'}`);
+    setText('toggle_coach', `Coach Tips: ${this.preferences.coachTipsEnabled ? 'On' : 'Off'}`);
   }
 
   private setButtonEnabled(buttons: UIButton[], id: ButtonActionId, enabled: boolean): void {
@@ -1663,6 +1827,54 @@ export class SkiEndlessGameScene extends Component {
     }
   }
 
+  private applyPreferenceVisuals(): void {
+    for (const particle of this.snowParticles) {
+      particle.node.active = this.preferences.snowFxEnabled;
+    }
+
+    for (const laneGuide of this.laneGuideNodes) {
+      laneGuide.active = this.preferences.assistLinesEnabled;
+    }
+  }
+
+  private loadPreferences(): void {
+    try {
+      if (typeof localStorage === 'undefined') {
+        return;
+      }
+
+      const raw = localStorage.getItem(PREFERENCES_STORAGE_KEY);
+      if (!raw) {
+        return;
+      }
+
+      const parsed = JSON.parse(raw) as Partial<SkiLocalPreferences>;
+      this.preferences = {
+        snowFxEnabled: parsed.snowFxEnabled ?? true,
+        assistLinesEnabled: parsed.assistLinesEnabled ?? true,
+        coachTipsEnabled: parsed.coachTipsEnabled ?? true
+      };
+    } catch {
+      this.preferences = {
+        snowFxEnabled: true,
+        assistLinesEnabled: true,
+        coachTipsEnabled: true
+      };
+    }
+  }
+
+  private persistPreferences(): void {
+    try {
+      if (typeof localStorage === 'undefined') {
+        return;
+      }
+
+      localStorage.setItem(PREFERENCES_STORAGE_KEY, JSON.stringify(this.preferences));
+    } catch {
+      // Ignore local persistence failures in preview environments.
+    }
+  }
+
   private drawSnowDrift(node: Node, centerX: number): void {
     const graphics = this.ensureGraphics(node);
     graphics.clear();
@@ -1675,31 +1887,66 @@ export class SkiEndlessGameScene extends Component {
 
   private drawSkier(graphics: Graphics): void {
     graphics.clear();
-    graphics.fillColor = new Color(40, 48, 64, 255);
-    graphics.roundRect(-52, -12, 104, 24, 12);
+    graphics.fillColor = new Color(26, 32, 45, 80);
+    graphics.ellipse(0, -28, 56, 15);
     graphics.fill();
 
-    graphics.fillColor = new Color(214, 68, 68, 255);
-    graphics.moveTo(0, 52);
-    graphics.lineTo(-26, -16);
-    graphics.lineTo(26, -16);
+    graphics.fillColor = new Color(33, 41, 57, 255);
+    graphics.roundRect(-52, -18, 104, 10, 6);
+    graphics.fill();
+
+    graphics.fillColor = new Color(214, 224, 236, 255);
+    graphics.roundRect(-48, -14, 96, 8, 4);
+    graphics.fill();
+
+    graphics.fillColor = new Color(217, 68, 78, 255);
+    graphics.moveTo(0, 42);
+    graphics.lineTo(-26, 0);
+    graphics.lineTo(26, 0);
     graphics.close();
     graphics.fill();
 
-    graphics.fillColor = new Color(245, 245, 245, 255);
-    graphics.circle(0, 18, 10);
+    graphics.fillColor = new Color(39, 47, 65, 255);
+    graphics.rect(-17, -10, 12, 20);
+    graphics.rect(5, -10, 12, 20);
+    graphics.fill();
+
+    graphics.fillColor = new Color(248, 252, 255, 255);
+    graphics.circle(0, 20, 11);
+    graphics.fill();
+
+    graphics.fillColor = new Color(38, 59, 88, 255);
+    graphics.circle(0, 23, 8);
+    graphics.fill();
+
+    graphics.fillColor = new Color(250, 191, 53, 255);
+    graphics.roundRect(-16, 10, 32, 6, 3);
     graphics.fill();
   }
 
   private drawCoin(graphics: Graphics): void {
     graphics.clear();
+    graphics.fillColor = new Color(32, 39, 52, 70);
+    graphics.ellipse(0, -18, 24, 8);
+    graphics.fill();
+
     graphics.fillColor = new Color(246, 196, 44, 255);
     graphics.circle(0, 0, 22);
     graphics.fill();
 
-    graphics.strokeColor = new Color(255, 242, 160, 255);
-    graphics.lineWidth = 4;
+    graphics.fillColor = new Color(255, 221, 96, 255);
     graphics.circle(0, 0, 16);
+    graphics.fill();
+
+    graphics.strokeColor = new Color(255, 246, 196, 255);
+    graphics.lineWidth = 4;
+    graphics.circle(0, 0, 12);
+    graphics.stroke();
+
+    graphics.strokeColor = new Color(255, 255, 255, 160);
+    graphics.lineWidth = 3;
+    graphics.moveTo(-6, 11);
+    graphics.lineTo(7, -2);
     graphics.stroke();
   }
 
@@ -1707,37 +1954,91 @@ export class SkiEndlessGameScene extends Component {
     graphics.clear();
 
     if (obstacleType === 'tree') {
-      graphics.fillColor = new Color(83, 59, 38, 255);
-      graphics.rect(-10, -40, 20, 30);
+      graphics.fillColor = new Color(29, 34, 43, 72);
+      graphics.ellipse(0, -44, 34, 12);
       graphics.fill();
 
-      graphics.fillColor = new Color(34, 138, 72, 255);
-      graphics.moveTo(0, 48);
-      graphics.lineTo(-42, -8);
-      graphics.lineTo(42, -8);
+      graphics.fillColor = new Color(83, 59, 38, 255);
+      graphics.roundRect(-8, -42, 16, 32, 6);
+      graphics.fill();
+
+      graphics.fillColor = new Color(25, 120, 72, 255);
+      graphics.moveTo(0, 44);
+      graphics.lineTo(-30, 6);
+      graphics.lineTo(30, 6);
+      graphics.close();
+      graphics.fill();
+
+      graphics.fillColor = new Color(31, 143, 82, 255);
+      graphics.moveTo(0, 26);
+      graphics.lineTo(-40, -12);
+      graphics.lineTo(40, -12);
+      graphics.close();
+      graphics.fill();
+
+      graphics.fillColor = new Color(47, 165, 101, 255);
+      graphics.moveTo(0, 10);
+      graphics.lineTo(-50, -30);
+      graphics.lineTo(50, -30);
+      graphics.close();
+      graphics.fill();
+
+      graphics.fillColor = new Color(240, 248, 255, 235);
+      graphics.moveTo(0, 38);
+      graphics.lineTo(-16, 18);
+      graphics.lineTo(16, 18);
       graphics.close();
       graphics.fill();
       return;
     }
 
     if (obstacleType === 'gate') {
-      graphics.fillColor = new Color(212, 62, 62, 255);
-      graphics.rect(-34, -44, 10, 90);
-      graphics.rect(24, -44, 10, 90);
+      graphics.fillColor = new Color(29, 34, 43, 66);
+      graphics.ellipse(0, -48, 52, 12);
       graphics.fill();
 
-      graphics.fillColor = new Color(255, 255, 255, 255);
-      graphics.rect(-24, 8, 48, 10);
+      graphics.fillColor = new Color(212, 62, 62, 255);
+      graphics.roundRect(-34, -44, 10, 92, 4);
+      graphics.roundRect(24, -44, 10, 92, 4);
+      graphics.fill();
+
+      graphics.fillColor = new Color(255, 247, 247, 255);
+      graphics.roundRect(-24, 10, 48, 10, 3);
+      graphics.fill();
+
+      graphics.fillColor = new Color(224, 78, 78, 255);
+      graphics.moveTo(-24, 22);
+      graphics.lineTo(-58, 10);
+      graphics.lineTo(-24, -4);
+      graphics.close();
+      graphics.fill();
+
+      graphics.moveTo(24, 22);
+      graphics.lineTo(58, 10);
+      graphics.lineTo(24, -4);
+      graphics.close();
       graphics.fill();
       return;
     }
 
-    graphics.fillColor = new Color(110, 118, 134, 255);
+    graphics.fillColor = new Color(29, 34, 43, 66);
+    graphics.ellipse(0, -48, 44, 12);
+    graphics.fill();
+
+    graphics.fillColor = new Color(106, 114, 129, 255);
     graphics.moveTo(0, 44);
     graphics.lineTo(-46, 12);
     graphics.lineTo(-34, -34);
     graphics.lineTo(28, -40);
     graphics.lineTo(50, 2);
+    graphics.close();
+    graphics.fill();
+
+    graphics.fillColor = new Color(154, 164, 181, 255);
+    graphics.moveTo(-8, 26);
+    graphics.lineTo(-24, -2);
+    graphics.lineTo(10, -12);
+    graphics.lineTo(22, 10);
     graphics.close();
     graphics.fill();
   }
