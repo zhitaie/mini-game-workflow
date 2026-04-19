@@ -8,7 +8,8 @@ const WORKSPACE_ORDER = [
   'packages/game-core-client',
   'services/api-server',
   'services/admin-web',
-  'apps/game-sample/client'
+  'apps/game-sample/client',
+  'apps/ski-endless/client'
 ];
 
 function getWorkspaceDirs() {

@@ -9,11 +9,11 @@ import {
   createSaveManager
 } from '@mini-game-workflow/game-core-client';
 import type { ConfigEnvelope, RemoteConfigRequestContext } from '@mini-game-workflow/game-core-types';
-import gameConfig from '../../../../game.config.js';
-import { localSkiEndlessConfig, type SkiEndlessConfig } from '../config/SkiEndlessConfig.js';
-import { skiEndlessSaveDefinition, type SkiEndlessSaveData } from '../data/SkiEndlessSave.js';
+import { skiEndlessGameConfig } from '../app/SkiEndlessGameConfig';
+import { localSkiEndlessConfig, type SkiEndlessConfig } from '../config/SkiEndlessConfig';
+import { skiEndlessSaveDefinition, type SkiEndlessSaveData } from '../data/SkiEndlessSave';
 
-interface LoginResponse {
+export interface LoginResponse {
   token: string;
   user: {
     id: number;
@@ -57,7 +57,7 @@ export async function bootstrapSkiEndlessRuntime(
 
   network.init({
     baseURL: options.baseURL ?? 'http://127.0.0.1:3000',
-    gameKey: gameConfig.gameKey,
+    gameKey: skiEndlessGameConfig.gameKey,
     platform: platform.getPlatform(),
     clientVersion,
     getToken: () => token,
@@ -106,7 +106,7 @@ export async function bootstrapSkiEndlessRuntime(
     path: '/api/auth/login',
     method: 'POST',
     body: {
-      gameKey: gameConfig.gameKey,
+      gameKey: skiEndlessGameConfig.gameKey,
       platform: platform.getPlatform(),
       code: loginCode.code,
       clientVersion
@@ -115,7 +115,7 @@ export async function bootstrapSkiEndlessRuntime(
   token = session.token;
 
   await config.refresh({
-    gameKey: gameConfig.gameKey,
+    gameKey: skiEndlessGameConfig.gameKey,
     platform: platform.getPlatform(),
     clientVersion
   });
@@ -144,7 +144,7 @@ export async function bootstrapSkiEndlessRuntime(
   }
 
   analytics.init({
-    gameKey: gameConfig.gameKey,
+    gameKey: skiEndlessGameConfig.gameKey,
     platform: platform.getPlatform(),
     clientVersion,
     sessionId: `ski-boot-${Date.now()}`,
@@ -154,14 +154,14 @@ export async function bootstrapSkiEndlessRuntime(
   analytics.track({
     eventName: 'ski_boot_ready',
     eventData: {
-      gameKey: gameConfig.gameKey
+      gameKey: skiEndlessGameConfig.gameKey
     }
   });
   await analytics.flush();
 
   return {
     runtime: createCoreRuntime({
-      gameConfig,
+      gameConfig: skiEndlessGameConfig,
       platform,
       network,
       config,

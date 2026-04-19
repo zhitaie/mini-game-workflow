@@ -1,12 +1,11 @@
 {
-  "extends": "../../../tsconfig.base.json",
+  /* Base configuration. Do not edit this field. */
+  "extends": "./temp/tsconfig.cocos.json",
+
+  /* Add your custom configuration here. */
   "compilerOptions": {
-    "noEmit": true,
-    "experimentalDecorators": true
-  },
-  "include": [
-    "assets/scripts/**/*.ts",
-    "types/**/*.d.ts",
-    "../game.config.ts"
-  ]
+    "strict": false,
+    "skipLibCheck": true,
+    "lib": ["ES2021", "DOM", "DOM.Iterable"]
+  }
 }

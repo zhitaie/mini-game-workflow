@@ -1,14 +1,13 @@
 {
-  "name": "@mini-game-workflow/ski-endless-client",
-  "version": "0.1.0",
+  "name": "client",
+  "uuid": "19e49d27-cb2d-49c1-8239-208521189516",
   "private": true,
-  "description": "Cocos Creator project root for ski-endless",
   "type": "module",
   "scripts": {
+    "build": "tsc --noEmit -p tsconfig.json",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
-  "dependencies": {
-    "@mini-game-workflow/game-core-client": "file:../../../packages/game-core-client",
-    "@mini-game-workflow/game-core-types": "file:../../../packages/game-core-types"
+  "creator": {
+    "version": "3.8.8"
   }
 }

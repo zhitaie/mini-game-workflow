@@ -46,6 +46,32 @@ export function ensureDevelopmentSeedData(database: DatabaseConnection): void {
     }
   });
 
+  gameConfigRepository.ensureActive({
+    gameKey: 'ski_endless',
+    platform: 'web',
+    configVersion: 'ski-seed-web-v1',
+    minClientVersion: '0.1.0',
+    maxClientVersion: '0.9.99',
+    payload: {
+      gameplay: {
+        baseSpeed: 8,
+        maxSpeed: 18,
+        obstacleDensity: 1,
+        scorePerMeter: 1
+      },
+      rewardAd: {
+        reviveEnabled: true,
+        doubleCoinEnabled: true
+      },
+      rotation: {
+        defaultMode: 'endless',
+        defaultMap: 'snowfield',
+        availableModes: ['endless'],
+        availableMaps: ['snowfield']
+      }
+    }
+  });
+
   if (noticeRepository.list({ gameKey: 'game_sample' }).length === 0) {
     noticeRepository.create({
       gameKey: 'game_sample',

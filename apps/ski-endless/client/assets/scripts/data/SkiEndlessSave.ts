@@ -1,5 +1,5 @@
 import type { SaveDefinition, SaveEnvelope } from '@mini-game-workflow/game-core-types';
-import type { SkiMapKey, SkiModeKey } from '../config/SkiEndlessConfig.js';
+import type { SkiMapKey, SkiModeKey } from '../config/SkiEndlessConfig';
 
 export interface SkiEndlessSaveData {
   coins: number;

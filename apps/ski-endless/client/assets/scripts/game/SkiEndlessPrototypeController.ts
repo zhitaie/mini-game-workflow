@@ -1,6 +1,6 @@
 import type { CoreRuntime } from '@mini-game-workflow/game-core-client';
-import type { SkiEndlessConfig, SkiMapKey, SkiModeKey } from '../config/SkiEndlessConfig.js';
-import type { SkiEndlessSaveData } from '../data/SkiEndlessSave.js';
+import type { SkiEndlessConfig, SkiMapKey, SkiModeKey } from '../config/SkiEndlessConfig';
+import type { SkiEndlessSaveData } from '../data/SkiEndlessSave';
 
 interface AdVerificationResponse {
   verified: boolean;

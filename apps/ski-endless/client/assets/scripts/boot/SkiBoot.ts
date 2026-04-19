@@ -1,6 +1,7 @@
-import { _decorator, Component, Label } from 'cc';
-import { bootstrapSkiEndlessRuntime } from './bootstrapSkiEndlessRuntime.js';
-import { SkiEndlessPrototypeController } from '../game/SkiEndlessPrototypeController.js';
+import { _decorator, Component, Label, director } from 'cc';
+import { bootstrapSkiEndlessRuntime } from './bootstrapSkiEndlessRuntime';
+import { SkiRuntimeSessionStore } from '../app/SkiRuntimeSessionStore';
+import { SkiEndlessPrototypeController } from '../game/SkiEndlessPrototypeController';
 
 const { ccclass, property } = _decorator;
 
@@ -9,6 +10,12 @@ export class SkiBoot extends Component {
   @property(Label)
   statusLabel: Label | null = null;
 
+  @property
+  nextSceneName = '';
+
+  @property
+  autoEnterDelaySeconds = 0.2;
+
   private controller: SkiEndlessPrototypeController | null = null;
 
   async start(): Promise<void> {
@@ -16,6 +23,11 @@ export class SkiBoot extends Component {
 
     try {
       const { runtime, session } = await bootstrapSkiEndlessRuntime();
+      SkiRuntimeSessionStore.set({
+        runtime,
+        session
+      });
+
       this.controller = new SkiEndlessPrototypeController(runtime);
       const snapshot = this.controller.getSnapshot();
 
@@ -27,9 +39,20 @@ export class SkiBoot extends Component {
           `coins=${String(snapshot.coins)}`,
           `bestDistance=${String(snapshot.bestDistance)}`,
           `map=${snapshot.selectedMap}`,
-          `mode=${snapshot.selectedMode}`
+          `mode=${snapshot.selectedMode}`,
+          this.nextSceneName ? `entering=${this.nextSceneName}` : 'entering=manual'
         ].join('\n')
       );
+
+      if (this.nextSceneName.trim()) {
+        this.scheduleOnce(() => {
+          director.loadScene(this.nextSceneName, (error) => {
+            if (error) {
+              this.renderStatus(`Failed to enter scene: ${error.message}`);
+            }
+          });
+        }, this.autoEnterDelaySeconds);
+      }
     } catch (error) {
       this.renderStatus(error instanceof Error ? error.message : 'Failed to boot ski-endless runtime.');
       throw error;
