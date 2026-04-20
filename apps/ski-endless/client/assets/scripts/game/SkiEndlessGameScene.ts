@@ -2314,10 +2314,7 @@ export class SkiEndlessGameScene extends Component {
       rock,
       gate
     ] = await Promise.all([
-      this.loadSpriteFrame([
-        'ski/backgrounds/background-snowfield-lite',
-        'ski/backgrounds/background-snowfield'
-      ]),
+      this.loadSpriteFrame('ski/backgrounds/background-snowfield-lite'),
       this.loadSpriteFrame('ski/sprites/player-skier-back'),
       this.loadSpriteFrame('ski/sprites/coin-gold'),
       this.loadSpriteFrame('ski/sprites/tree-snow-pine'),
