@@ -5,9 +5,9 @@ type SkiBgmAssetKey = Exclude<SkiBgmMode, 'none'>;
 type SkiSfxAssetKey = 'button' | 'coin' | 'crash' | 'lane' | 'restart' | 'revive' | 'reward';
 
 const BGM_PATHS: Record<SkiBgmAssetKey, string[]> = {
-  home: ['ski/audio/bgm/home-loop'],
+  home: ['ski/audio/bgm/run-loop'],
   run: ['ski/audio/bgm/run-loop'],
-  result: ['ski/audio/bgm/result-loop']
+  result: ['ski/audio/bgm/run-loop']
 };
 
 const SFX_PATHS: Record<SkiSfxAssetKey, string[]> = {

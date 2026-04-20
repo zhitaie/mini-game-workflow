@@ -2314,7 +2314,10 @@ export class SkiEndlessGameScene extends Component {
       rock,
       gate
     ] = await Promise.all([
-      this.loadSpriteFrame('ski/backgrounds/background-snowfield'),
+      this.loadSpriteFrame([
+        'ski/backgrounds/background-snowfield-lite',
+        'ski/backgrounds/background-snowfield'
+      ]),
       this.loadSpriteFrame('ski/sprites/player-skier-back'),
       this.loadSpriteFrame('ski/sprites/coin-gold'),
       this.loadSpriteFrame('ski/sprites/tree-snow-pine'),
@@ -2336,16 +2339,26 @@ export class SkiEndlessGameScene extends Component {
     this.renderHint();
   }
 
-  private loadSpriteFrame(path: string): Promise<SpriteFrame | null> {
-    return new Promise((resolve) => {
-      resources.load(`${path}/spriteFrame`, SpriteFrame, (error, frame) => {
-        if (error) {
-          resolve(null);
-          return;
-        }
-        resolve(frame);
+  private async loadSpriteFrame(path: string | string[]): Promise<SpriteFrame | null> {
+    const candidates = Array.isArray(path) ? path : [path];
+
+    for (const candidate of candidates) {
+      const frame = await new Promise<SpriteFrame | null>((resolve) => {
+        resources.load(`${candidate}/spriteFrame`, SpriteFrame, (error, loadedFrame) => {
+          if (error) {
+            resolve(null);
+            return;
+          }
+          resolve(loadedFrame);
+        });
       });
-    });
+
+      if (frame) {
+        return frame;
+      }
+    }
+
+    return null;
   }
 
   private createBackgroundSprite(parent: Node, frame: SpriteFrame): void {
