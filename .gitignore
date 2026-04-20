@@ -5,6 +5,9 @@ dist
 .vscode
 .env
 .env.*
+!.env.example
+!.env.local.example
+!.env.production.example
 coverage
 *.log
 .data

@@ -1,0 +1,102 @@
+name: Deploy Mini Game Workflow API
+
+on:
+  push:
+    branches: ["main", "master"]
+
+env:
+  REGISTRY: crpi-4kzkxda7yqwmhagm.cn-beijing.personal.cr.aliyuncs.com
+  NAMESPACE: lictor
+  IMAGE_NAME: mini-game-workflow-api
+  REGISTRY_USERNAME: 巍巍华夏
+  SERVER_HOST: 82.156.4.55
+  SERVER_PORT: 22
+  SERVER_USERNAME: ubuntu
+  DEPLOY_PATH: ~/app_data/mini_game_workflow
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Validate required deploy configuration
+        env:
+          API_HOST: ${{ vars.API_HOST }}
+          API_PORT: ${{ vars.API_PORT }}
+          API_DB_FILE: ${{ vars.API_DB_FILE }}
+          ALIYUN_REGISTRY_PASSWORD: ${{ secrets.ALIYUN_REGISTRY_PASSWORD }}
+          SERVER_SSH_KEY: ${{ secrets.SERVER_SSH_KEY }}
+          MINI_GAME_WORKFLOW_TOKEN_SECRET: ${{ secrets.MINI_GAME_WORKFLOW_TOKEN_SECRET }}
+          MINI_GAME_WORKFLOW_ADMIN_PASSWORD_SECRET: ${{ secrets.MINI_GAME_WORKFLOW_ADMIN_PASSWORD_SECRET }}
+          MINI_GAME_WORKFLOW_ADMIN_SESSION_SECRET: ${{ secrets.MINI_GAME_WORKFLOW_ADMIN_SESSION_SECRET }}
+          MINI_GAME_WORKFLOW_ADMIN_BOOTSTRAP_PASSWORD: ${{ secrets.MINI_GAME_WORKFLOW_ADMIN_BOOTSTRAP_PASSWORD }}
+        run: |
+          test -n "$API_HOST" || { echo "Missing required variable: API_HOST"; exit 1; }
+          test -n "$API_PORT" || { echo "Missing required variable: API_PORT"; exit 1; }
+          test -n "$API_DB_FILE" || { echo "Missing required variable: API_DB_FILE"; exit 1; }
+          test -n "$ALIYUN_REGISTRY_PASSWORD" || { echo "Missing required secret: ALIYUN_REGISTRY_PASSWORD"; exit 1; }
+          test -n "$SERVER_SSH_KEY" || { echo "Missing required secret: SERVER_SSH_KEY"; exit 1; }
+          test -n "$MINI_GAME_WORKFLOW_TOKEN_SECRET" || { echo "Missing required secret: MINI_GAME_WORKFLOW_TOKEN_SECRET"; exit 1; }
+          test -n "$MINI_GAME_WORKFLOW_ADMIN_PASSWORD_SECRET" || { echo "Missing required secret: MINI_GAME_WORKFLOW_ADMIN_PASSWORD_SECRET"; exit 1; }
+          test -n "$MINI_GAME_WORKFLOW_ADMIN_SESSION_SECRET" || { echo "Missing required secret: MINI_GAME_WORKFLOW_ADMIN_SESSION_SECRET"; exit 1; }
+          test -n "$MINI_GAME_WORKFLOW_ADMIN_BOOTSTRAP_PASSWORD" || { echo "Missing required secret: MINI_GAME_WORKFLOW_ADMIN_BOOTSTRAP_PASSWORD"; exit 1; }
+
+      - name: Login to Aliyun ACR
+        run: docker login --username="${{ env.REGISTRY_USERNAME }}" --password="${{ secrets.ALIYUN_REGISTRY_PASSWORD }}" ${{ env.REGISTRY }}
+
+      - name: Build and Push Docker Image
+        run: |
+          docker build -t ${{ env.REGISTRY }}/${{ env.NAMESPACE }}/${{ env.IMAGE_NAME }}:latest .
+          docker push ${{ env.REGISTRY }}/${{ env.NAMESPACE }}/${{ env.IMAGE_NAME }}:latest
+
+      - name: Deploy to Tencent Cloud
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ env.SERVER_HOST }}
+          username: ${{ env.SERVER_USERNAME }}
+          port: ${{ env.SERVER_PORT }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          script: |
+            mkdir -p ${{ env.DEPLOY_PATH }}/data
+            cd ${{ env.DEPLOY_PATH }}
+
+            cat << 'EOF' > docker-compose.yml
+            services:
+              api:
+                image: ${{ env.REGISTRY }}/${{ env.NAMESPACE }}/${{ env.IMAGE_NAME }}:latest
+                container_name: mini-game-workflow-api
+                restart: always
+                ports:
+                  - "${{ vars.API_PORT }}:${{ vars.API_PORT }}"
+                environment:
+                  NODE_ENV: "production"
+                  API_HOST: "${{ vars.API_HOST }}"
+                  API_PORT: "${{ vars.API_PORT }}"
+                  API_DB_FILE: "${{ vars.API_DB_FILE }}"
+                  MINI_GAME_WORKFLOW_TOKEN_SECRET: "${{ secrets.MINI_GAME_WORKFLOW_TOKEN_SECRET }}"
+                  MINI_GAME_WORKFLOW_ADMIN_PASSWORD_SECRET: "${{ secrets.MINI_GAME_WORKFLOW_ADMIN_PASSWORD_SECRET }}"
+                  MINI_GAME_WORKFLOW_ADMIN_SESSION_SECRET: "${{ secrets.MINI_GAME_WORKFLOW_ADMIN_SESSION_SECRET }}"
+                  MINI_GAME_WORKFLOW_ADMIN_BOOTSTRAP_USERNAME: "${{ vars.MINI_GAME_WORKFLOW_ADMIN_BOOTSTRAP_USERNAME }}"
+                  MINI_GAME_WORKFLOW_ADMIN_BOOTSTRAP_DISPLAY_NAME: "${{ vars.MINI_GAME_WORKFLOW_ADMIN_BOOTSTRAP_DISPLAY_NAME }}"
+                  MINI_GAME_WORKFLOW_ADMIN_BOOTSTRAP_PASSWORD: "${{ secrets.MINI_GAME_WORKFLOW_ADMIN_BOOTSTRAP_PASSWORD }}"
+                volumes:
+                  - ./data:/data
+            EOF
+
+            sudo docker login --username="${{ env.REGISTRY_USERNAME }}" --password="${{ secrets.ALIYUN_REGISTRY_PASSWORD }}" ${{ env.REGISTRY }}
+            sudo docker compose pull
+            sudo docker compose up -d --remove-orphans
+
+            for attempt in 1 2 3 4 5 6 7 8 9 10; do
+              if curl --fail --silent "http://127.0.0.1:${{ vars.API_PORT }}/health" > /dev/null; then
+                exit 0
+              fi
+              sleep 3
+            done
+
+            echo "Deployment smoke check failed"
+            sudo docker compose ps
+            sudo docker compose logs --tail=200 api || true
+            exit 1

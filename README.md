@@ -51,3 +51,21 @@
 - `health` 只是健康检查接口，不是接口列表页
 - 它当前只返回最小 JSON 状态，例如 `ok`、服务名和数据库文件路径
 - 如果你打开后只看到一段 JSON，这是当前设计的正常行为
+
+部署说明：
+
+- 当前仓库已经补了面向 `services/api-server` 的 Dockerfile 和 GitHub Actions 自动部署工作流：
+  - [Dockerfile](/Users/baiyexing/myProject/mini-game-workflow/Dockerfile)
+  - [.github/workflows/deploy-api-server.yml](/Users/baiyexing/myProject/mini-game-workflow/.github/workflows/deploy-api-server.yml)
+- 现阶段建议的小游戏业务域名是：`https://api-mini.zhitaie.com`
+- 建议在 Nginx Proxy Manager 中将该域名转发到宿主机 `3003`
+- 线上部署建议使用：
+  - `API_HOST=0.0.0.0`
+  - `API_PORT=3003`
+  - `API_DB_FILE=/data/mini-game-workflow.sqlite`
+- 生产环境不能继续使用开发管理员默认密码；部署工作流会要求额外提供：
+  - `MINI_GAME_WORKFLOW_ADMIN_BOOTSTRAP_PASSWORD`
+- 环境变量模板见：
+  - [.env.example](/Users/baiyexing/myProject/mini-game-workflow/.env.example)
+  - [.env.local.example](/Users/baiyexing/myProject/mini-game-workflow/.env.local.example)
+  - [.env.production.example](/Users/baiyexing/myProject/mini-game-workflow/.env.production.example)

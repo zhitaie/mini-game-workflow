@@ -3,7 +3,7 @@ import { decodeToken, type AuthClaims } from './common/auth.js';
 import { hasAdminPermission, type AdminActor } from './common/admin.js';
 import { errorCodes } from './common/errors.js';
 import { fail } from './common/response.js';
-import { initializeDevelopmentDatabase } from './db/bootstrap.js';
+import { initializeDatabase } from './db/bootstrap.js';
 import { AdLogRepository } from './db/repositories/ad-log.repository.js';
 import { AdminAuditLogRepository } from './db/repositories/admin-audit-log.repository.js';
 import { AdminSessionRepository } from './db/repositories/admin-session.repository.js';
@@ -240,7 +240,7 @@ export interface CreateAppOptions {
 }
 
 export function createApp(options: CreateAppOptions = {}): ApiApp {
-  const database = initializeDevelopmentDatabase({
+  const database = initializeDatabase({
     filePath: options.database?.filePath
   });
   const adminAuditLogRepository = new AdminAuditLogRepository(database);

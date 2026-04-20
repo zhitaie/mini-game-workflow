@@ -1,4 +1,4 @@
-import { createPasswordHash, DEFAULT_ADMIN_ROLES, DEFAULT_ADMIN_USERS } from '../common/admin.js';
+import { createPasswordHash, DEFAULT_ADMIN_ROLES, DEFAULT_ADMIN_USERS, type AdminUserSeed } from '../common/admin.js';
 import type { DatabaseConnection, DatabaseConnectionOptions } from './connection.js';
 import { createDatabaseConnection } from './connection.js';
 import { AdminRoleRepository } from './repositories/admin-role.repository.js';
@@ -6,7 +6,32 @@ import { AdminUserRepository } from './repositories/admin-user.repository.js';
 import { GameConfigRepository } from './repositories/game-config.repository.js';
 import { NoticeRepository } from './repositories/notice.repository.js';
 
-export function ensureDevelopmentSeedData(database: DatabaseConnection): void {
+function isProductionEnvironment(): boolean {
+  return process.env.NODE_ENV === 'production';
+}
+
+function readBootstrapAdminUsers(): AdminUserSeed[] {
+  if (!isProductionEnvironment()) {
+    return DEFAULT_ADMIN_USERS;
+  }
+
+  const password = process.env.MINI_GAME_WORKFLOW_ADMIN_BOOTSTRAP_PASSWORD?.trim();
+
+  if (!password) {
+    throw new Error('MINI_GAME_WORKFLOW_ADMIN_BOOTSTRAP_PASSWORD is required in production');
+  }
+
+  return [
+    {
+      username: process.env.MINI_GAME_WORKFLOW_ADMIN_BOOTSTRAP_USERNAME?.trim() || 'admin',
+      password,
+      displayName: process.env.MINI_GAME_WORKFLOW_ADMIN_BOOTSTRAP_DISPLAY_NAME?.trim() || 'Production Admin',
+      roleCode: 'super_admin'
+    }
+  ];
+}
+
+export function ensureDatabaseSeedData(database: DatabaseConnection): void {
   const adminRoleRepository = new AdminRoleRepository(database);
   const adminUserRepository = new AdminUserRepository(database);
   const gameConfigRepository = new GameConfigRepository(database);
@@ -21,16 +46,14 @@ export function ensureDevelopmentSeedData(database: DatabaseConnection): void {
     });
   }
 
-  for (const user of DEFAULT_ADMIN_USERS) {
-    if (!adminUserRepository.findByUsername(user.username)) {
-      adminUserRepository.upsert({
-        username: user.username,
-        displayName: user.displayName,
-        passwordHash: createPasswordHash(user.password),
-        roleCode: user.roleCode,
-        status: 'active'
-      });
-    }
+  for (const user of readBootstrapAdminUsers()) {
+    adminUserRepository.upsert({
+      username: user.username,
+      displayName: user.displayName,
+      passwordHash: createPasswordHash(user.password),
+      roleCode: user.roleCode,
+      status: 'active'
+    });
   }
 
   gameConfigRepository.ensureActive({
@@ -95,8 +118,8 @@ export function ensureDevelopmentSeedData(database: DatabaseConnection): void {
   }
 }
 
-export function initializeDevelopmentDatabase(options: DatabaseConnectionOptions = {}): DatabaseConnection {
+export function initializeDatabase(options: DatabaseConnectionOptions = {}): DatabaseConnection {
   const database = createDatabaseConnection(options);
-  ensureDevelopmentSeedData(database);
+  ensureDatabaseSeedData(database);
   return database;
 }
