@@ -57,6 +57,10 @@
 - 当前仓库已经补了面向 `services/api-server` 的 Dockerfile 和 GitHub Actions 自动部署工作流：
   - [Dockerfile](/Users/baiyexing/myProject/mini-game-workflow/Dockerfile)
   - [.github/workflows/deploy-api-server.yml](/Users/baiyexing/myProject/mini-game-workflow/.github/workflows/deploy-api-server.yml)
+- Docker 部署镜像现在只构建：
+  - `packages/game-core-types`
+  - `services/api-server`
+- 这样不会把依赖 Cocos 编辑器临时文件的 `apps/ski-endless/client` 一起拉进 API 构建链
 - 现阶段建议的小游戏业务域名是：`https://api-mini.zhitaie.com`
 - 建议在 Nginx Proxy Manager 中将该域名转发到宿主机 `3003`
 - 线上部署建议使用：

@@ -9,7 +9,7 @@ COPY services ./services
 COPY scripts ./scripts
 
 RUN npm ci --no-audit --no-fund
-RUN npm run build
+RUN npm run build:api-server
 
 FROM node:22-alpine AS runner
 

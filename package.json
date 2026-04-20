@@ -10,7 +10,9 @@
   ],
   "scripts": {
     "build": "node scripts/run-workspaces.mjs build",
+    "build:api-server": "npm run build --workspace packages/game-core-types && npm run build --workspace services/api-server",
     "typecheck": "node scripts/run-workspaces.mjs typecheck",
+    "typecheck:api-server": "npm run typecheck --workspace packages/game-core-types && npm run typecheck --workspace services/api-server",
     "serve:api": "node services/api-server/dist/services/api-server/src/cli.js",
     "dev:stack": "node scripts/start-dev-stack.mjs",
     "db:init": "node --experimental-specifier-resolution=node scripts/init-dev-db.mjs",
