@@ -8,3 +8,5 @@ dist
 coverage
 *.log
 .data
+apps/ski-endless/project.config.json
+apps/ski-endless/project.private.config.json

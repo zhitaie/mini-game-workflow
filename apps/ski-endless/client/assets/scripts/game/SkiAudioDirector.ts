@@ -11,13 +11,13 @@ const BGM_PATHS: Record<SkiBgmAssetKey, string[]> = {
 };
 
 const SFX_PATHS: Record<SkiSfxAssetKey, string[]> = {
-  button: ['ski/audio/sfx/ui-click-sfx', 'ski/audio/sfx/ui-click'],
-  coin: ['ski/audio/sfx/coin-sfx', 'ski/audio/sfx/coin'],
-  crash: ['ski/audio/sfx/crash-sfx', 'ski/audio/sfx/crash'],
-  lane: ['ski/audio/sfx/lane-shift-sfx', 'ski/audio/sfx/lane-shift'],
-  restart: ['ski/audio/sfx/ui-click-sfx', 'ski/audio/sfx/ui-click'],
-  revive: ['ski/audio/sfx/ui-click-sfx', 'ski/audio/sfx/ui-click'],
-  reward: ['ski/audio/sfx/ui-click-sfx', 'ski/audio/sfx/ui-click']
+  button: ['ski/audio/sfx/ui-click'],
+  coin: ['ski/audio/sfx/coin'],
+  crash: ['ski/audio/sfx/crash'],
+  lane: ['ski/audio/sfx/lane-shift'],
+  restart: ['ski/audio/sfx/ui-click'],
+  revive: ['ski/audio/sfx/ui-click'],
+  reward: ['ski/audio/sfx/ui-click']
 };
 
 const BGM_VOLUMES: Record<SkiBgmAssetKey, number> = {

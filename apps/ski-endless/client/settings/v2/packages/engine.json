@@ -36,7 +36,7 @@
             "_value": false
           },
           "rich-text": {
-            "_value": true
+            "_value": false
           },
           "mask": {
             "_value": true
@@ -79,7 +79,7 @@
             "_value": false
           },
           "physics-2d": {
-            "_value": true,
+            "_value": false,
             "_option": "physics-2d-box2d"
           },
           "physics-2d-box2d": {
@@ -116,16 +116,16 @@
             "_value": false
           },
           "particle-2d": {
-            "_value": true
+            "_value": false
           },
           "audio": {
             "_value": true
           },
           "video": {
-            "_value": true
+            "_value": false
           },
           "webview": {
-            "_value": true
+            "_value": false
           },
           "tween": {
             "_value": true
@@ -143,17 +143,17 @@
             "_value": false
           },
           "tiled-map": {
-            "_value": true
+            "_value": false
           },
           "vendor-google": {
             "_value": false
           },
           "spine": {
-            "_value": true,
+            "_value": false,
             "_option": "spine-3.8"
           },
           "spine-3.8": {
-            "_value": true,
+            "_value": false,
             "_flags": {
               "LOAD_SPINE_MANUALLY": false
             }
@@ -165,7 +165,7 @@
             }
           },
           "dragon-bones": {
-            "_value": true
+            "_value": false
           },
           "marionette": {
             "_value": false
@@ -197,22 +197,14 @@
           "audio",
           "base",
           "custom-pipeline",
-          "dragon-bones",
           "gfx-webgl",
           "gfx-webgl2",
           "graphics",
           "intersection-2d",
           "mask",
-          "particle-2d",
-          "physics-2d-box2d",
           "profiler",
-          "rich-text",
-          "spine-3.8",
-          "tiled-map",
           "tween",
-          "ui",
-          "video",
-          "webview"
+          "ui"
         ],
         "noDeprecatedFeatures": {
           "value": false,
