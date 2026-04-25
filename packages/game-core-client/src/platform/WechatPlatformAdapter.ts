@@ -25,20 +25,22 @@ interface WechatRequestTask {
   abort(): void;
 }
 
+interface WechatRequestOptions {
+  url: string;
+  method: string;
+  header?: Record<string, string>;
+  data?: string;
+  timeout?: number;
+  success?(result: WechatRequestSuccessResult): void;
+  fail?(error: unknown): void;
+}
+
 interface WechatNamespace {
   login(options: {
     success(result: WechatLoginSuccessResult): void;
     fail?(error: unknown): void;
   }): void;
-  request(options: {
-    url: string;
-    method: string;
-    header?: Record<string, string>;
-    data?: string;
-    timeout?: number;
-    success?(result: WechatRequestSuccessResult): void;
-    fail?(error: unknown): void;
-  }): WechatRequestTask | void;
+  request(options: WechatRequestOptions): WechatRequestTask | void;
   createRewardedVideoAd(options: { adUnitId: string }): WechatRewardedVideoAd;
 }
 
@@ -81,6 +83,52 @@ function getWechatNamespace(): WechatNamespace {
   return namespace;
 }
 
+function toWechatErrorMessage(prefix: string, error: unknown): string {
+  if (error instanceof Error) {
+    return `${prefix}: ${error.message}`;
+  }
+
+  if (error && typeof error === 'object' && 'errMsg' in error) {
+    return `${prefix}: ${String((error as { errMsg?: unknown }).errMsg)}`;
+  }
+
+  try {
+    return `${prefix}: ${JSON.stringify(error)}`;
+  } catch {
+    return prefix;
+  }
+}
+
+function buildWechatRequestOptions(
+  url: string,
+  init: Parameters<NetworkRequestImpl>[1],
+  callbacks: {
+    success(result: WechatRequestSuccessResult): void;
+    fail(error: unknown): void;
+  }
+): WechatRequestOptions {
+  const requestOptions: WechatRequestOptions = {
+    url,
+    method: init.method,
+    success: callbacks.success,
+    fail: callbacks.fail
+  };
+
+  if (Object.keys(init.headers).length > 0) {
+    requestOptions.header = init.headers;
+  }
+
+  if (init.body !== undefined) {
+    requestOptions.data = init.body;
+  }
+
+  if (typeof init.timeoutMs === 'number' && Number.isFinite(init.timeoutMs) && init.timeoutMs > 0) {
+    requestOptions.timeout = init.timeoutMs;
+  }
+
+  return requestOptions;
+}
+
 export function isWechatMiniGameRuntime(): boolean {
   const namespace = (globalThis as typeof globalThis & { wx?: Partial<WechatNamespace> }).wx;
   return !!namespace && typeof namespace.login === 'function' && typeof namespace.request === 'function';
@@ -101,12 +149,7 @@ export function createWechatRequestImpl(): NetworkRequestImpl {
         }
       };
 
-      const task = wx.request({
-        url,
-        method: init.method,
-        header: init.headers,
-        data: init.body,
-        timeout: init.timeoutMs,
+      const task = wx.request(buildWechatRequestOptions(url, init, {
         success(result) {
           if (settled) {
             return;
@@ -128,9 +171,9 @@ export function createWechatRequestImpl(): NetworkRequestImpl {
 
           settled = true;
           finalize();
-          reject(error instanceof Error ? error : new Error('wx.request failed.'));
+          reject(new Error(toWechatErrorMessage('wx.request failed', error)));
         }
-      });
+      }));
 
       if (init.timeoutMs && init.timeoutMs > 0) {
         timeoutId = setTimeout(() => {
