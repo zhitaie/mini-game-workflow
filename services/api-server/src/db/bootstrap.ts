@@ -6,6 +6,25 @@ import { AdminUserRepository } from './repositories/admin-user.repository.js';
 import { GameConfigRepository } from './repositories/game-config.repository.js';
 import { NoticeRepository } from './repositories/notice.repository.js';
 
+const SKI_ENDLESS_SEED_CONFIG_PAYLOAD = {
+  gameplay: {
+    baseSpeed: 6.6,
+    maxSpeed: 12.4,
+    obstacleDensity: 0.92,
+    scorePerMeter: 1
+  },
+  rewardAd: {
+    reviveEnabled: true,
+    doubleCoinEnabled: true
+  },
+  rotation: {
+    defaultMode: 'endless',
+    defaultMap: 'snowfield',
+    availableModes: ['endless'],
+    availableMaps: ['snowfield']
+  }
+};
+
 function isProductionEnvironment(): boolean {
   return process.env.NODE_ENV === 'production';
 }
@@ -69,31 +88,16 @@ export function ensureDatabaseSeedData(database: DatabaseConnection): void {
     }
   });
 
-  gameConfigRepository.setActive({
-    gameKey: 'ski_endless',
-    platform: 'web',
-    configVersion: 'ski-seed-web-v2',
-    minClientVersion: '0.1.0',
-    maxClientVersion: '0.9.99',
-    payload: {
-      gameplay: {
-        baseSpeed: 6.6,
-        maxSpeed: 12.4,
-        obstacleDensity: 0.92,
-        scorePerMeter: 1
-      },
-      rewardAd: {
-        reviveEnabled: true,
-        doubleCoinEnabled: true
-      },
-      rotation: {
-        defaultMode: 'endless',
-        defaultMap: 'snowfield',
-        availableModes: ['endless'],
-        availableMaps: ['snowfield']
-      }
-    }
-  });
+  for (const platform of ['web', 'wechat']) {
+    gameConfigRepository.setActive({
+      gameKey: 'ski_endless',
+      platform,
+      configVersion: `ski-seed-${platform}-v2`,
+      minClientVersion: '0.1.0',
+      maxClientVersion: '0.9.99',
+      payload: SKI_ENDLESS_SEED_CONFIG_PAYLOAD
+    });
+  }
 
   if (noticeRepository.list({ gameKey: 'game_sample' }).length === 0) {
     noticeRepository.create({
