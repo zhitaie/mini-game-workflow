@@ -2,17 +2,24 @@ import type { ApiResponse, NetworkContext, NetworkRequestOptions } from '@mini-g
 import { NetworkBusinessError, type NetworkManager } from './NetworkManager.js';
 
 function buildURL(baseURL: string, path: string, query?: Record<string, string | number | boolean | undefined>): string {
-  const url = new URL(path, baseURL);
+  const normalizedBaseURL = baseURL.replace(/\/+$/u, '');
+  const normalizedPath = path.replace(/^\/+/u, '');
+  const url = /^https?:\/\//u.test(path) ? path : `${normalizedBaseURL}/${normalizedPath}`;
 
+  const queryParts: string[] = [];
   if (query) {
     Object.entries(query).forEach(([key, value]) => {
       if (value !== undefined) {
-        url.searchParams.set(key, String(value));
+        queryParts.push(`${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`);
       }
     });
   }
 
-  return url.toString();
+  if (queryParts.length === 0) {
+    return url;
+  }
+
+  return `${url}${url.includes('?') ? '&' : '?'}${queryParts.join('&')}`;
 }
 
 export function createNetworkManager(): NetworkManager {
