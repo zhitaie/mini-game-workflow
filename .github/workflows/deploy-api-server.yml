@@ -5,14 +5,14 @@ on:
     branches: ["main", "master"]
 
 env:
-  REGISTRY: crpi-4kzkxda7yqwmhagm.cn-beijing.personal.cr.aliyuncs.com
-  NAMESPACE: lictor
+  REGISTRY: ${{ vars.ALIYUN_REGISTRY }}
+  NAMESPACE: ${{ vars.ALIYUN_REGISTRY_NAMESPACE }}
   IMAGE_NAME: mini-game-workflow-api
-  REGISTRY_USERNAME: 巍巍华夏
-  SERVER_HOST: 82.156.4.55
-  SERVER_PORT: 22
-  SERVER_USERNAME: ubuntu
-  DEPLOY_PATH: ~/app_data/mini_game_workflow
+  REGISTRY_USERNAME: ${{ vars.ALIYUN_REGISTRY_USERNAME }}
+  SERVER_HOST: ${{ vars.SERVER_HOST }}
+  SERVER_PORT: ${{ vars.SERVER_PORT }}
+  SERVER_USERNAME: ${{ vars.SERVER_USERNAME }}
+  DEPLOY_PATH: ${{ vars.DEPLOY_PATH }}
 
 jobs:
   build-and-deploy:
@@ -33,6 +33,13 @@ jobs:
           MINI_GAME_WORKFLOW_ADMIN_SESSION_SECRET: ${{ secrets.MINI_GAME_WORKFLOW_ADMIN_SESSION_SECRET }}
           MINI_GAME_WORKFLOW_ADMIN_BOOTSTRAP_PASSWORD: ${{ secrets.MINI_GAME_WORKFLOW_ADMIN_BOOTSTRAP_PASSWORD }}
         run: |
+          test -n "$REGISTRY" || { echo "Missing required variable: ALIYUN_REGISTRY"; exit 1; }
+          test -n "$NAMESPACE" || { echo "Missing required variable: ALIYUN_REGISTRY_NAMESPACE"; exit 1; }
+          test -n "$REGISTRY_USERNAME" || { echo "Missing required variable: ALIYUN_REGISTRY_USERNAME"; exit 1; }
+          test -n "$SERVER_HOST" || { echo "Missing required variable: SERVER_HOST"; exit 1; }
+          test -n "$SERVER_PORT" || { echo "Missing required variable: SERVER_PORT"; exit 1; }
+          test -n "$SERVER_USERNAME" || { echo "Missing required variable: SERVER_USERNAME"; exit 1; }
+          test -n "$DEPLOY_PATH" || { echo "Missing required variable: DEPLOY_PATH"; exit 1; }
           test -n "$API_HOST" || { echo "Missing required variable: API_HOST"; exit 1; }
           test -n "$API_PORT" || { echo "Missing required variable: API_PORT"; exit 1; }
           test -n "$API_DB_FILE" || { echo "Missing required variable: API_DB_FILE"; exit 1; }

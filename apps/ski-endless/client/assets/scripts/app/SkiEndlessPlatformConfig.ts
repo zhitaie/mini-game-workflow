@@ -1,3 +1,5 @@
+import { skiEndlessPlatformConfigLocal } from './SkiEndlessPlatformConfig.local';
+
 export interface SkiEndlessPlatformConfig {
   web: {
     apiBaseURL: string;
@@ -10,15 +12,4 @@ export interface SkiEndlessPlatformConfig {
   };
 }
 
-export const skiEndlessPlatformConfig: SkiEndlessPlatformConfig = {
-  web: {
-    apiBaseURL: 'http://127.0.0.1:3000'
-  },
-  wechat: {
-    apiBaseURL: 'https://api-mini.zhitaie.com',
-    rewardedVideoAdUnitIds: {
-      ski_revive: 'replace-with-wechat-revive-ad-unit-id',
-      ski_double_coin: 'replace-with-wechat-double-coin-ad-unit-id'
-    }
-  }
-};
+export const skiEndlessPlatformConfig: SkiEndlessPlatformConfig = skiEndlessPlatformConfigLocal;

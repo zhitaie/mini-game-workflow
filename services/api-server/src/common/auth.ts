@@ -6,7 +6,20 @@ export interface AuthClaims {
   platform: string;
 }
 
-const TOKEN_SECRET = process.env.MINI_GAME_WORKFLOW_TOKEN_SECRET ?? 'mini-game-workflow-dev-secret';
+function readTokenSecret(): string {
+  const value = process.env.MINI_GAME_WORKFLOW_TOKEN_SECRET?.trim();
+  if (value) {
+    return value;
+  }
+
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('MINI_GAME_WORKFLOW_TOKEN_SECRET is required in production');
+  }
+
+  return 'mini-game-workflow-dev-secret';
+}
+
+const TOKEN_SECRET = readTokenSecret();
 
 function signPayload(payload: string): string {
   return createHmac('sha256', TOKEN_SECRET).update(payload).digest('base64url');

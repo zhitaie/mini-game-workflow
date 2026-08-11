@@ -16,6 +16,10 @@ node_modules/
 
 .DS_Store
 
+# Developer-specific API endpoint and ad placement configuration.
+assets/scripts/app/SkiEndlessPlatformConfig.local.ts
+assets/scripts/app/SkiEndlessPlatformConfig.local.ts.meta
+
 #//////////////////////////
 # VSCode
 #//////////////////////////

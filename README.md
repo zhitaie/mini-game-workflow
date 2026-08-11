@@ -61,11 +61,21 @@
   - `packages/game-core-types`
   - `services/api-server`
 - 这样不会把依赖 Cocos 编辑器临时文件的 `apps/ski-endless/client` 一起拉进 API 构建链
-- 现阶段建议的小游戏业务域名是：`https://api-mini.zhitaie.com`
-- 建议在 Nginx Proxy Manager 中将该域名转发到宿主机 `3003`
-- 线上部署建议使用：
+- 请为小游戏 API 配置你自己的 HTTPS 业务域名，并在反向代理中转发到 API 进程端口。
+- 线上部署的实际参数不应提交到仓库；GitHub Actions 从 Repository Variables 读取：
+  - `ALIYUN_REGISTRY`
+  - `ALIYUN_REGISTRY_NAMESPACE`
+  - `ALIYUN_REGISTRY_USERNAME`
+  - `SERVER_HOST`
+  - `SERVER_PORT`
+  - `SERVER_USERNAME`
+  - `DEPLOY_PATH`
+  - `API_HOST`
+  - `API_PORT`
+  - `API_DB_FILE`
+- 线上环境变量示例：
   - `API_HOST=0.0.0.0`
-  - `API_PORT=3003`
+  - `API_PORT=<your-api-port>`
   - `API_DB_FILE=/data/mini-game-workflow.sqlite`
 - 生产环境不能继续使用开发管理员默认密码；部署工作流会要求额外提供：
   - `MINI_GAME_WORKFLOW_ADMIN_BOOTSTRAP_PASSWORD`

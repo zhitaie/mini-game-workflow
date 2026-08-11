@@ -79,8 +79,28 @@ export const DEFAULT_ADMIN_USERS: AdminUserSeed[] = [
 ];
 
 const ADMIN_SESSION_TTL_MS = Number(process.env.MINI_GAME_WORKFLOW_ADMIN_SESSION_TTL_MS ?? 1000 * 60 * 60 * 24 * 7);
-const ADMIN_PASSWORD_SECRET = process.env.MINI_GAME_WORKFLOW_ADMIN_PASSWORD_SECRET ?? 'mini-game-workflow-admin-password-secret';
-const ADMIN_SESSION_SECRET = process.env.MINI_GAME_WORKFLOW_ADMIN_SESSION_SECRET ?? 'mini-game-workflow-admin-session-secret';
+
+function readAdminSecret(name: string, developmentFallback: string): string {
+  const value = process.env[name]?.trim();
+  if (value) {
+    return value;
+  }
+
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error(`${name} is required in production`);
+  }
+
+  return developmentFallback;
+}
+
+const ADMIN_PASSWORD_SECRET = readAdminSecret(
+  'MINI_GAME_WORKFLOW_ADMIN_PASSWORD_SECRET',
+  'mini-game-workflow-admin-password-secret'
+);
+const ADMIN_SESSION_SECRET = readAdminSecret(
+  'MINI_GAME_WORKFLOW_ADMIN_SESSION_SECRET',
+  'mini-game-workflow-admin-session-secret'
+);
 
 function randomToken(size: number): string {
   if (globalThis.crypto?.getRandomValues) {
