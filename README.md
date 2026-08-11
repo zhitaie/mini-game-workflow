@@ -1,5 +1,7 @@
 # mini-game-workflow
 
+![mini-game-workflow social preview](docs/images/open-source-social-preview.png)
+
 一个面向多款小游戏复用的 TypeScript monorepo：共享游戏协议与客户端能力、可替换的 API 服务、管理端壳，以及基于 Cocos Creator 的滑雪样例游戏。
 
 > 当前为 `0.1.0` 早期可运行版本。它适合学习、二次开发和验证架构边界；生产发布前仍应完成自己的安全、数据备份、合规与平台审核。
@@ -12,6 +14,31 @@
 - `apps/game-sample`：浏览器样例客户端，用于联调共享能力。
 - `apps/ski-endless/client`：Cocos Creator 3.8.8 滑雪样例，包含微信小游戏平台适配入口。
 - `docs/`、`sql/`：架构约束、协议和面向 MySQL 8 的目标生产数据模型。
+
+## 架构
+
+```mermaid
+flowchart LR
+  subgraph Games[独立游戏]
+    Sample[浏览器样例]
+    Ski[Cocos 滑雪样例]
+  end
+
+  Shared[共享客户端包\n类型、网络、配置、存档、广告、埋点]
+  API[API 服务\n登录、配置、存档、奖励、埋点]
+  Admin[管理端]
+  DevDB[(SQLite 开发持久化)]
+  ProdDB[(MySQL 8 目标生产模型)]
+
+  Sample --> Shared
+  Ski --> Shared
+  Shared --> API
+  Admin --> API
+  API --> DevDB
+  API -. 生产适配目标 .-> ProdDB
+```
+
+游戏玩法、美术和页面留在 `apps/<game>/`；只有经过多个游戏验证的能力才进入 `packages/`。`gameKey` 用于配置、存档、身份和运营数据隔离。
 
 ## 快速开始
 
@@ -54,9 +81,32 @@ npm run build
 npm run verify:minimal
 npm run verify:dev-stack
 npm run verify:persistence
+npm run verify:ci
 ```
 
 公开 CI 会执行上述可复现验证。Cocos 校验由本地 Cocos Creator 环境完成，因为其生成的引擎声明不应进入仓库。
+
+## 常见问题
+
+### 为什么根构建不校验 Cocos 脚本？
+
+Cocos Creator 会在本机生成引擎类型声明和 `temp/` 目录，它们不应提交。根 `npm run build` 只校验干净克隆可复现的 Node.js 工作区；打开 Cocos Creator 导入项目后，使用 `npm run build:with-cocos` 校验滑雪项目。
+
+### SQLite 和 MySQL 的关系是什么？
+
+当前 SQLite 是本地开发和联调持久化层，便于一键启动。`sql/` 与 `docs/05-data/` 仍以 MySQL 8 为生产目标；生产数据库适配与迁移是公开路线图中的后续工作，不能把开发 SQLite 文件直接当作生产方案。
+
+### 配置文件、AppID 和广告位应该提交吗？
+
+不应该。`SkiEndlessPlatformConfig.local.ts`、`.env` 和 Cocos 本机文件都被忽略。只提交 `*.example.*` 模板，真实 API 地址、AppID、广告位、密码和令牌必须留在本机或部署平台的 Variables / Secrets 中。
+
+### 为什么部署工作流显示为跳过？
+
+公开 CI 与私有部署分开。未配置所有部署 Variables 的 fork 或开源克隆会安全跳过部署；这不影响 `Validate` 对构建和核心链路的验证。
+
+### 如何提出问题或参与开发？
+
+提交前先阅读 [CONTRIBUTING.md](CONTRIBUTING.md)。功能请求必须说明它属于共享层还是单个游戏；安全问题必须按 [SECURITY.md](SECURITY.md) 私密报告。
 
 ## 部署
 
@@ -67,6 +117,12 @@ API 服务支持 Docker 部署。生产配置应只保存在部署环境或 GitH
 - [部署工作流](.github/workflows/deploy-api-server.yml)
 
 部署工作流只会在所需的仓库 Variables 都配置后执行；未配置的 fork 或公开克隆不会因此导致验证失败。
+
+## 版本与路线图
+
+- 版本兼容性与发布规则见 [版本策略](docs/07-dev-process/03-VERSIONING_AND_RELEASE_POLICY.md)。
+- 下一阶段的公开目标见 [ROADMAP.md](ROADMAP.md)。
+- 部署、备份、恢复与故障处理边界见 [运行手册](docs/08-operations/00-OPERATIONS_RUNBOOK.md)。
 
 ## 参与和安全
 

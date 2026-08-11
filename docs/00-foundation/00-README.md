@@ -35,6 +35,8 @@
 - `06-admin/00-ADMIN_SCOPE_AND_MENU.md`：后台范围、菜单结构与隔离规则。
 - `06-admin/01-ADMIN_CORE_PAGES_SPEC.md`：配置管理、用户查询、日志与公告页面规范。
 - `07-dev-process/00-IMPLEMENTATION_ROADMAP.md`：从文档到代码的实施顺序与阶段目标。
+- `07-dev-process/03-VERSIONING_AND_RELEASE_POLICY.md`：版本、兼容性与发布规则。
+- `08-operations/00-OPERATIONS_RUNBOOK.md`：部署、备份、恢复和故障处理边界。
 - `02-workspace/04-REPO_FILE_RESPONSIBILITIES.md`：仓库首版目录树与关键文件职责。
 - `07-dev-process/01-FIRST_CODE_SKELETON.md`：第一版代码骨架与最小文件清单。
 - `07-dev-process/02-COCOS_SKI_ENDLESS_ADOPTION.md`：第一款真实 Cocos 游戏的接入方式、目录形态与改造边界。

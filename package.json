@@ -30,7 +30,8 @@
     "verify:admin-mutations": "node --experimental-specifier-resolution=node scripts/verify-admin-mutations.mjs",
     "verify:admin-shell": "node --experimental-specifier-resolution=node scripts/verify-admin-shell.mjs",
     "verify:admin-render": "node --experimental-specifier-resolution=node scripts/verify-admin-render.mjs",
-    "verify:persistence": "node --experimental-specifier-resolution=node scripts/verify-persistence-flow.mjs"
+    "verify:persistence": "node --experimental-specifier-resolution=node scripts/verify-persistence-flow.mjs",
+    "verify:ci": "node scripts/verify-ci.mjs"
   },
   "devDependencies": {
     "typescript": "^5.8.2"

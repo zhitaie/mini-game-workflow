@@ -32,11 +32,5 @@ jobs:
       - name: Build reproducible workspaces
         run: npm run build
 
-      - name: Verify core client and API flow
-        run: npm run verify:minimal
-
-      - name: Verify local development stack
-        run: npm run verify:dev-stack
-
-      - name: Verify persisted API data
-        run: npm run verify:persistence
+      - name: Verify public contracts and admin flows
+        run: npm run verify:ci
