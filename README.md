@@ -1,92 +1,80 @@
 # mini-game-workflow
 
-一个面向多款小游戏复用的 monorepo 工作流仓库。
+一个面向多款小游戏复用的 TypeScript monorepo：共享游戏协议与客户端能力、可替换的 API 服务、管理端壳，以及基于 Cocos Creator 的滑雪样例游戏。
 
-当前仓库包含两部分内容：
+> 当前为 `0.1.0` 早期可运行版本。它适合学习、二次开发和验证架构边界；生产发布前仍应完成自己的安全、数据备份、合规与平台审核。
 
-- `docs/`：平台架构、协议、数据模型与实施路线文档
-- 首批代码骨架：`apps/`、`packages/`、`services/`、`sql/`
+## 包含什么
 
-当前阶段目标：
+- `packages/`：不包含具体玩法的共享类型、配置、存档、网络与奖励能力。
+- `services/api-server`：本地 SQLite 开发服务，包含配置、存档、奖励、管理端鉴权与审计模型。
+- `services/admin-web`：单人开发者可用的管理端壳。
+- `apps/game-sample`：浏览器样例客户端，用于联调共享能力。
+- `apps/ski-endless/client`：Cocos Creator 3.8.8 滑雪样例，包含微信小游戏平台适配入口。
+- `docs/`、`sql/`：架构约束、协议和面向 MySQL 8 的目标生产数据模型。
 
-- 保持共享层边界稳定
-- 先跑通登录、配置、存档的最小链路
-- 为后续广告、奖励、埋点、后台接入保留稳定扩展位
+## 快速开始
 
-当前实现说明：
+前置条件：Node.js 22、npm，以及 Cocos 样例开发所需的 Cocos Creator 3.8.8。
 
-- `services/api-server` 已从纯内存仓储切到基于 `node:sqlite` 的本地文件持久化，用于开发期真实落盘和联调验证
-- `services/api-server` 现在包含后台管理员账号、角色、会话与审计日志模型，后台不再依赖固定开发 token
-- `services/api-server` 现在已经有独立的 Node HTTP 入口，可以通过构建后执行 `node services/api-server/dist/services/api-server/src/cli.js` 启动
-- 根目录现在提供统一的本地 dev stack 入口：先执行 `npm run build`，再执行 `npm run dev:stack`，然后打开 `http://127.0.0.1:3100`
-- 这个入口页会同时暴露：
-  - 后台壳：`/admin.html`
-  - 样例客户端：`/game-sample.html`
-  - API 健康检查：`http://127.0.0.1:3000/health`
-- `docs/05-data/*.md` 与 `sql/001_init_core_tables.sql` 仍保持 MySQL 8 作为目标生产模型
-- 也就是说，当前代码上的 SQLite 是开发持久化适配层，不是对文档目标数据库的否定
+```bash
+npm install
+npm run setup:ski-local-config
+npm run build
+npm run dev:stack
+```
 
-本地开发默认管理员账号：
-
-- `admin / dev-admin-password`
-- `operator / dev-operator-password`
-- `viewer / dev-viewer-password`
-
-最小本地启动步骤：
-
-1. `npm install`
-2. `npm run setup:ski-local-config`
-3. `npm run build`
-4. `npm run dev:stack`
-5. 打开 `http://127.0.0.1:3100`
-
-小游戏本地配置：
-
-- `npm run setup:ski-local-config` 仅在本地配置不存在时生成 `SkiEndlessPlatformConfig.local.ts`，不会覆盖已有文件。
-- 该配置文件被 Git 忽略；填写自己的微信 API 地址和广告位后不会被提交。
-- `npm run build` 也会自动执行这一步，因此新的克隆仓库可以直接完成类型构建。
-
-可直接访问的页面：
+本地入口：
 
 - 门户：`http://127.0.0.1:3100`
-- 后台：`http://127.0.0.1:3100/admin.html`
-- 样例客户端：`http://127.0.0.1:3100/game-sample.html`
-- 健康检查：`http://127.0.0.1:3000/health`
+- 管理端：`http://127.0.0.1:3100/admin.html`
+- 浏览器样例：`http://127.0.0.1:3100/game-sample.html`
+- API 健康检查：`http://127.0.0.1:3000/health`
 
-说明：
+本地开发管理员账号仅用于开发环境：`admin / dev-admin-password`。
 
-- `health` 只是健康检查接口，不是接口列表页
-- 它当前只返回最小 JSON 状态，例如 `ok`、服务名和数据库文件路径
-- 如果你打开后只看到一段 JSON，这是当前设计的正常行为
+## Cocos 样例
 
-部署说明：
+`apps/ski-endless/client` 是独立的 Cocos 项目，Cocos Creator 会生成 `temp/`、`library/` 等本机文件；这些文件不会提交，也不属于可复现的 Node.js 构建。
 
-- 当前仓库已经补了面向 `services/api-server` 的 Dockerfile 和 GitHub Actions 自动部署工作流：
-  - [Dockerfile](/Users/baiyexing/myProject/mini-game-workflow/Dockerfile)
-  - [.github/workflows/deploy-api-server.yml](/Users/baiyexing/myProject/mini-game-workflow/.github/workflows/deploy-api-server.yml)
-- Docker 部署镜像现在只构建：
-  - `packages/game-core-types`
-  - `services/api-server`
-- 这样不会把依赖 Cocos 编辑器临时文件的 `apps/ski-endless/client` 一起拉进 API 构建链
-- 请为小游戏 API 配置你自己的 HTTPS 业务域名，并在反向代理中转发到 API 进程端口。
-- 线上部署的实际参数不应提交到仓库；GitHub Actions 从 Repository Variables 读取：
-  - `ALIYUN_REGISTRY`
-  - `ALIYUN_REGISTRY_NAMESPACE`
-  - `ALIYUN_REGISTRY_USERNAME`
-  - `SERVER_HOST`
-  - `SERVER_PORT`
-  - `SERVER_USERNAME`
-  - `DEPLOY_PATH`
-  - `API_HOST`
-  - `API_PORT`
-  - `API_DB_FILE`
-- 线上环境变量示例：
-  - `API_HOST=0.0.0.0`
-  - `API_PORT=<your-api-port>`
-  - `API_DB_FILE=/data/mini-game-workflow.sqlite`
-- 生产环境不能继续使用开发管理员默认密码；部署工作流会要求额外提供：
-  - `MINI_GAME_WORKFLOW_ADMIN_BOOTSTRAP_PASSWORD`
-- 环境变量模板见：
-  - [.env.example](/Users/baiyexing/myProject/mini-game-workflow/.env.example)
-  - [.env.local.example](/Users/baiyexing/myProject/mini-game-workflow/.env.local.example)
-  - [.env.production.example](/Users/baiyexing/myProject/mini-game-workflow/.env.production.example)
+1. 用 Cocos Creator 3.8.8 打开 `apps/ski-endless/client`。
+2. 在编辑器中预览或构建小游戏。
+3. 需要命令行额外校验时，先让编辑器完成导入，再执行：
+
+```bash
+npm run build:with-cocos
+```
+
+`npm run setup:ski-local-config` 会在缺失时从公开示例生成本机配置文件。请在生成的 `SkiEndlessPlatformConfig.local.ts` 中填写自己的 API 地址和广告位；它已被 Git 忽略，不能提交真实 AppID、域名或广告位 ID。
+
+## 验证
+
+```bash
+npm run build
+npm run verify:minimal
+npm run verify:dev-stack
+npm run verify:persistence
+```
+
+公开 CI 会执行上述可复现验证。Cocos 校验由本地 Cocos Creator 环境完成，因为其生成的引擎声明不应进入仓库。
+
+## 部署
+
+API 服务支持 Docker 部署。生产配置应只保存在部署环境或 GitHub Actions 的 Variables / Secrets 中，不能提交到仓库。参考：
+
+- [Dockerfile](Dockerfile)
+- [环境变量示例](.env.production.example)
+- [部署工作流](.github/workflows/deploy-api-server.yml)
+
+部署工作流只会在所需的仓库 Variables 都配置后执行；未配置的 fork 或公开克隆不会因此导致验证失败。
+
+## 参与和安全
+
+- 贡献方式见 [CONTRIBUTING.md](CONTRIBUTING.md)。
+- 安全问题见 [SECURITY.md](SECURITY.md)，请勿公开泄露漏洞或密钥。
+- 社区行为规范见 [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)。
+- 变更记录见 [CHANGELOG.md](CHANGELOG.md)。
+
+## License
+
+本项目采用 [Apache License 2.0](LICENSE)。

@@ -1,0 +1,42 @@
+name: Validate
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: validate-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Build reproducible workspaces
+        run: npm run build
+
+      - name: Verify core client and API flow
+        run: npm run verify:minimal
+
+      - name: Verify local development stack
+        run: npm run verify:dev-stack
+
+      - name: Verify persisted API data
+        run: npm run verify:persistence

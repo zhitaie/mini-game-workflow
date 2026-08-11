@@ -2,17 +2,19 @@
   "name": "mini-game-workflow",
   "version": "0.1.0",
   "private": true,
-  "packageManager": "pnpm@10.7.0",
+  "packageManager": "npm@10.9.4",
   "workspaces": [
     "apps/*/client",
     "packages/*",
     "services/*"
   ],
   "scripts": {
-    "build": "node scripts/run-workspaces.mjs build",
+    "build": "npm run setup:ski-local-config && node scripts/run-workspaces.mjs build",
+    "build:with-cocos": "npm run build && npm run build --workspace @mini-game-workflow/ski-endless-client",
     "setup:ski-local-config": "npm run setup:local-config --workspace @mini-game-workflow/ski-endless-client",
     "build:api-server": "npm run build --workspace packages/game-core-types && npm run build --workspace services/api-server",
     "typecheck": "node scripts/run-workspaces.mjs typecheck",
+    "typecheck:with-cocos": "npm run typecheck && npm run typecheck --workspace @mini-game-workflow/ski-endless-client",
     "typecheck:api-server": "npm run typecheck --workspace packages/game-core-types && npm run typecheck --workspace services/api-server",
     "serve:api": "node services/api-server/dist/services/api-server/src/cli.js",
     "dev:stack": "node scripts/start-dev-stack.mjs",

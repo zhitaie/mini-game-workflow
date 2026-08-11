@@ -11,5 +11,6 @@ dist
 coverage
 *.log
 .data
+talk-ChatGPT.md
 apps/ski-endless/project.config.json
 apps/ski-endless/project.private.config.json

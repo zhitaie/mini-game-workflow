@@ -12,11 +12,15 @@ const WORKSPACE_ORDER = [
   'apps/ski-endless/client'
 ];
 
-function getWorkspaceDirs() {
-  return WORKSPACE_ORDER.map((relativePath) => ({
-    relativePath,
-    cwd: resolve(ROOT_DIR, relativePath)
-  }));
+const COCOS_WORKSPACE = 'apps/ski-endless/client';
+
+function getWorkspaceDirs({ includeCocos }) {
+  return WORKSPACE_ORDER
+    .filter((relativePath) => includeCocos || relativePath !== COCOS_WORKSPACE)
+    .map((relativePath) => ({
+      relativePath,
+      cwd: resolve(ROOT_DIR, relativePath)
+    }));
 }
 
 function runScript(scriptName, cwd) {
@@ -41,12 +45,13 @@ function runScript(scriptName, cwd) {
 
 async function main() {
   const scriptName = process.argv[2];
+  const includeCocos = process.argv.includes('--include-cocos');
 
   if (!scriptName) {
     throw new Error('Missing script name. Usage: node scripts/run-workspaces.mjs <script>');
   }
 
-  for (const workspace of getWorkspaceDirs()) {
+  for (const workspace of getWorkspaceDirs({ includeCocos })) {
     console.log(`[run-workspaces] ${workspace.relativePath} -> npm run ${scriptName}`);
     await runScript(scriptName, workspace.cwd);
   }

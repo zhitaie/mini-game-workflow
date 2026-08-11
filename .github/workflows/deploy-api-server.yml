@@ -16,6 +16,12 @@ env:
 
 jobs:
   build-and-deploy:
+    # Public forks can validate the repository without providing private infrastructure.
+    if: >-
+      ${{ vars.ALIYUN_REGISTRY != '' && vars.ALIYUN_REGISTRY_NAMESPACE != '' &&
+          vars.ALIYUN_REGISTRY_USERNAME != '' && vars.SERVER_HOST != '' &&
+          vars.SERVER_PORT != '' && vars.SERVER_USERNAME != '' && vars.DEPLOY_PATH != '' &&
+          vars.API_HOST != '' && vars.API_PORT != '' && vars.API_DB_FILE != '' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
@@ -59,7 +65,7 @@ jobs:
           docker push ${{ env.REGISTRY }}/${{ env.NAMESPACE }}/${{ env.IMAGE_NAME }}:latest
 
       - name: Deploy to Tencent Cloud
-        uses: appleboy/ssh-action@master
+        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
         with:
           host: ${{ env.SERVER_HOST }}
           username: ${{ env.SERVER_USERNAME }}
