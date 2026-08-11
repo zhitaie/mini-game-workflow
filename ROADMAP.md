@@ -8,7 +8,7 @@
 - [x] 公开构建和核心验证 CI。
 - [x] 本地启动、Cocos 接入和配置说明。
 - [ ] GitHub Social Preview 上传与仓库主页元数据完善。
-- [ ] 首个 GitHub Release 与已知限制说明。
+- [x] 首个 GitHub Release 与已知限制说明。
 
 ## 下一优先级
 
