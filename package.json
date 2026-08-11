@@ -10,6 +10,7 @@
   ],
   "scripts": {
     "build": "node scripts/run-workspaces.mjs build",
+    "setup:ski-local-config": "npm run setup:local-config --workspace @mini-game-workflow/ski-endless-client",
     "build:api-server": "npm run build --workspace packages/game-core-types && npm run build --workspace services/api-server",
     "typecheck": "node scripts/run-workspaces.mjs typecheck",
     "typecheck:api-server": "npm run typecheck --workspace packages/game-core-types && npm run typecheck --workspace services/api-server",

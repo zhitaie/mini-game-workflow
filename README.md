@@ -35,9 +35,16 @@
 最小本地启动步骤：
 
 1. `npm install`
-2. `npm run build`
-3. `npm run dev:stack`
-4. 打开 `http://127.0.0.1:3100`
+2. `npm run setup:ski-local-config`
+3. `npm run build`
+4. `npm run dev:stack`
+5. 打开 `http://127.0.0.1:3100`
+
+小游戏本地配置：
+
+- `npm run setup:ski-local-config` 仅在本地配置不存在时生成 `SkiEndlessPlatformConfig.local.ts`，不会覆盖已有文件。
+- 该配置文件被 Git 忽略；填写自己的微信 API 地址和广告位后不会被提交。
+- `npm run build` 也会自动执行这一步，因此新的克隆仓库可以直接完成类型构建。
 
 可直接访问的页面：
 

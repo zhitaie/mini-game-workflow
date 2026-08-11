@@ -14,6 +14,12 @@ Important:
 - The `AppID` is build-time metadata for Cocos Creator and WeChat DevTools.
 - Do not put the `AppID` into shared runtime code or shared packages.
 
+Initial local configuration:
+
+1. From the monorepo root, run `npm run setup:ski-local-config`.
+2. Set your API URL and rewarded-video ad unit IDs in the generated ignored local configuration.
+3. The generated configuration is never overwritten by the setup command and is excluded from Git.
+
 Build notes:
 
 1. Open this project in Cocos Creator.

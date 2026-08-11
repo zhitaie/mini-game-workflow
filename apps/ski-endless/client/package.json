@@ -5,6 +5,8 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "prebuild": "npm run setup:local-config",
+    "setup:local-config": "node ../../../scripts/ensure-ski-local-config.mjs",
     "build": "tsc --noEmit -p tsconfig.json",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },

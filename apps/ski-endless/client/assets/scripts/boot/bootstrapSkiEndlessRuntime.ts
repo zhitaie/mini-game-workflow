@@ -51,6 +51,11 @@ export interface BootstrapSkiEndlessRuntimeResult {
   session: LoginResponse;
 }
 
+function isUnconfiguredWechatApiBaseURL(baseURL: string): boolean {
+  const normalized = baseURL.trim().toLowerCase();
+  return normalized === '' || normalized.includes('replace-with') || normalized.includes('.example.com');
+}
+
 export async function bootstrapSkiEndlessRuntime(
   options: BootstrapSkiEndlessRuntimeOptions = {}
 ): Promise<BootstrapSkiEndlessRuntimeResult> {
@@ -73,8 +78,8 @@ export async function bootstrapSkiEndlessRuntime(
     options.requestImpl ??
     (useWechat ? createWechatRequestImpl() : undefined);
 
-  if (useWechat && baseURL.includes('replace-with-your-mini-game-api')) {
-    throw new Error('请先在 SkiEndlessPlatformConfig.ts 中填写微信小游戏 API 地址。');
+  if (useWechat && isUnconfiguredWechatApiBaseURL(baseURL)) {
+    throw new Error('请先在 SkiEndlessPlatformConfig.local.ts 中填写微信小游戏 API 地址。');
   }
 
   network.init({
