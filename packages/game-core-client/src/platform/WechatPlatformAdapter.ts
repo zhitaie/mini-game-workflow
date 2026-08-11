@@ -46,6 +46,13 @@ interface WechatNamespace {
 
 interface WechatPlatformAdapterOptions {
   rewardedVideoAdUnitIds?: Record<string, string>;
+  allowMockRewardedVideoOnInvalidAdUnitId?: boolean;
+}
+
+class MockWechatRewardedVideoAdHandle implements PlatformAdHandle {
+  async show(): Promise<boolean> {
+    return true;
+  }
 }
 
 class WechatRewardedVideoAdHandle implements PlatformAdHandle {
@@ -67,9 +74,18 @@ class WechatRewardedVideoAdHandle implements PlatformAdHandle {
   private async showWithRetry(): Promise<void> {
     try {
       await this.ad.show();
-    } catch {
-      await this.ad.load();
-      await this.ad.show();
+    } catch (firstError) {
+      try {
+        await this.ad.load();
+        await this.ad.show();
+      } catch (secondError) {
+        throw new Error(
+          toWechatErrorMessage(
+            'WeChat rewarded video failed',
+            secondError ?? firstError
+          )
+        );
+      }
     }
   }
 }
@@ -97,6 +113,20 @@ function toWechatErrorMessage(prefix: string, error: unknown): string {
   } catch {
     return prefix;
   }
+}
+
+function isInvalidAdUnitId(adUnitId: string | undefined): boolean {
+  if (!adUnitId) {
+    return true;
+  }
+
+  const normalized = adUnitId.trim().toLowerCase();
+  return (
+    normalized === '' ||
+    normalized.includes('replace-with') ||
+    normalized.includes('your-') ||
+    normalized.includes('placeholder')
+  );
 }
 
 function buildWechatRequestOptions(
@@ -196,15 +226,20 @@ export class WechatPlatformAdapter implements PlatformAdapter {
   readonly ad = {
     createRewardedVideo: async (sceneKey: string): Promise<PlatformAdHandle> => {
       const adUnitId = this.options.rewardedVideoAdUnitIds?.[sceneKey];
-      if (!adUnitId) {
+      if (isInvalidAdUnitId(adUnitId)) {
+        if (this.options.allowMockRewardedVideoOnInvalidAdUnitId) {
+          return new MockWechatRewardedVideoAdHandle();
+        }
+
         throw new Error(`Missing WeChat rewarded video adUnitId for sceneKey: ${sceneKey}`);
       }
 
       const wx = getWechatNamespace();
-      const cacheKey = `${sceneKey}:${adUnitId}`;
+      const validAdUnitId = adUnitId as string;
+      const cacheKey = `${sceneKey}:${validAdUnitId}`;
       let ad = this.rewardedAds.get(cacheKey);
       if (!ad) {
-        ad = wx.createRewardedVideoAd({ adUnitId });
+        ad = wx.createRewardedVideoAd({ adUnitId: validAdUnitId });
         this.rewardedAds.set(cacheKey, ad);
       }
 

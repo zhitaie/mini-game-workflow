@@ -103,6 +103,22 @@ export class SkiEndlessPrototypeController {
     };
   }
 
+  previewFinishRun(input: SkiRunFinishInput): SkiRunSummary {
+    const config = this.runtime.config.getAll();
+    const current = this.runtime.save.getAll();
+    const score = Math.floor(input.distance * config.gameplay.scorePerMeter);
+
+    return {
+      distance: input.distance,
+      score,
+      coinsCollected: input.coinsCollected,
+      bestDistance: Math.max(current.data.bestDistance, input.distance),
+      bestScore: Math.max(current.data.bestScore, score),
+      selectedMode: current.data.selectedMode,
+      selectedMap: current.data.selectedMap
+    };
+  }
+
   async finishRun(input: SkiRunFinishInput): Promise<SkiRunSummary> {
     const config = this.runtime.config.getAll();
     const current = this.runtime.save.getAll();

@@ -63,6 +63,7 @@ const TRACK_HALF_WIDTH_NEAR = 308;
 const LANE_SPREAD_FAR = 34;
 const LANE_SPREAD_NEAR = 178;
 const PLAYER_COLLISION_DEPTH = 0.78;
+const TOUCH_CENTER_LANE_HALF_WIDTH = 120;
 const DISTANCE_FACTOR = 12;
 const ENTITY_DEPTH_FACTOR = 0.066;
 const STRIPE_DEPTH_FACTOR = 0.058;
@@ -147,6 +148,11 @@ interface UIButton {
   activeColor: Color;
   disabledColor: Color;
   enabled: boolean;
+}
+
+interface TouchLocation {
+  ui: Vec2;
+  canvas: Vec2;
 }
 
 interface UIStatCard {
@@ -389,7 +395,7 @@ export class SkiEndlessGameScene extends Component {
   private onTouchStart(event: EventTouch): void {
     this.audioDirector.unlock();
 
-    const location = event.getUILocation();
+    const location = this.getTouchLocation(event);
 
     if (this.phase === 'home') {
       if (this.tryHandleButtons(location, this.homeButtons)) {
@@ -430,20 +436,52 @@ export class SkiEndlessGameScene extends Component {
       return;
     }
 
-    const visibleSize = view.getVisibleSize();
-    const sectionWidth = visibleSize.width / 3;
-
-    if (location.x < sectionWidth) {
-      this.setLane(-1);
+    const targetLane = this.resolveTouchLane(location.canvas.x);
+    if (targetLane !== this.runState.laneIndex) {
+      this.setLane(targetLane);
       return;
     }
+  }
 
-    if (location.x > sectionWidth * 2) {
-      this.setLane(1);
-      return;
+  private getTouchLocation(event: EventTouch): TouchLocation {
+    const uiLocation = event.getUILocation();
+    const canvasTransform = this.canvasNode?.getComponent(UITransform);
+
+    if (!canvasTransform) {
+      return {
+        ui: uiLocation,
+        canvas: uiLocation
+      };
     }
 
-    void this.finishRun('touch_center_stop');
+    const local = canvasTransform.convertToNodeSpaceAR(new Vec3(uiLocation.x, uiLocation.y, 0));
+    return {
+      ui: uiLocation,
+      canvas: new Vec2(local.x, local.y)
+    };
+  }
+
+  private getCanvasNodePosition(node: Node): Vec2 {
+    const canvasTransform = this.canvasNode?.getComponent(UITransform);
+
+    if (!canvasTransform) {
+      return new Vec2(node.worldPosition.x, node.worldPosition.y);
+    }
+
+    const local = canvasTransform.convertToNodeSpaceAR(node.worldPosition);
+    return new Vec2(local.x, local.y);
+  }
+
+  private resolveTouchLane(canvasX: number): LaneIndex {
+    if (canvasX < -TOUCH_CENTER_LANE_HALF_WIDTH) {
+      return -1;
+    }
+
+    if (canvasX > TOUCH_CENTER_LANE_HALF_WIDTH) {
+      return 1;
+    }
+
+    return 0;
   }
 
   private ensureSceneNodes(): void {
@@ -1124,6 +1162,8 @@ export class SkiEndlessGameScene extends Component {
     const survivors: TrackEntity[] = [];
 
     for (const entity of this.entities) {
+      const previousDepth = entity.depth;
+      const previousY = this.projectDepthToY(previousDepth);
       entity.depth += moveDelta;
 
       if (entity.depth > 1.08) {
@@ -1136,9 +1176,21 @@ export class SkiEndlessGameScene extends Component {
       if (this.runState && this.phase === 'running' && !this.runState.finished) {
         const isSameLane = entity.laneIndex === this.runState.laneIndex;
         const entityY = this.projectDepthToY(entity.depth);
+        const depthPadding = entity.kind === 'coin' ? 0.05 : 0.075;
+        const yPadding = entity.kind === 'coin' ? 34 : 60;
+        const minDepth = Math.min(previousDepth, entity.depth);
+        const maxDepth = Math.max(previousDepth, entity.depth);
+        const minY = Math.min(previousY, entityY);
+        const maxY = Math.max(previousY, entityY);
+        const crossedPlayerDepth =
+          minDepth <= PLAYER_COLLISION_DEPTH + depthPadding &&
+          maxDepth >= PLAYER_COLLISION_DEPTH - depthPadding;
+        const crossedPlayerY = minY <= PLAYER_Y + yPadding && maxY >= PLAYER_Y - yPadding;
         const isNearPlayer =
-          Math.abs(entity.depth - PLAYER_COLLISION_DEPTH) < (entity.kind === 'coin' ? 0.05 : 0.06) ||
-          Math.abs(entityY - PLAYER_Y) < (entity.kind === 'coin' ? 34 : 52);
+          crossedPlayerDepth ||
+          crossedPlayerY ||
+          Math.abs(entity.depth - PLAYER_COLLISION_DEPTH) < depthPadding ||
+          Math.abs(entityY - PLAYER_Y) < yPadding;
 
         if (isSameLane && isNearPlayer) {
           if (entity.kind === 'coin') {
@@ -1168,39 +1220,61 @@ export class SkiEndlessGameScene extends Component {
       return;
     }
 
-    this.busy = true;
+    const finishInput = {
+      distance: Math.floor(this.runState.distance),
+      coinsCollected: this.runState.coinsCollected,
+      crashedBy
+    };
+
+    this.lastSummary = this.controller.previewFinishRun(finishInput);
+    this.savedCoinBank = this.controller.getSnapshot().coins + finishInput.coinsCollected;
+    this.runState.finished = true;
+    this.phase = 'result';
+    this.resultPanel && (this.resultPanel.active = true);
+    this.homePanel && (this.homePanel.active = false);
+    this.rankPanel && (this.rankPanel.active = false);
+    this.noticePanel && (this.noticePanel.active = false);
+    this.hudPanelRoot && (this.hudPanelRoot.active = true);
+
+    if (this.resultTitleLabel) {
+      this.resultTitleLabel.string = '本局结束';
+    }
+
+    this.audioDirector.playCrash();
+    this.audioDirector.setBgmMode('result');
+    this.renderResultInfo(crashedBy);
+    this.updateResultButtons();
+    this.renderHud();
+    this.renderHint();
+    void this.persistFinishedRun(finishInput, crashedBy);
+  }
+
+  private async persistFinishedRun(
+    input: { distance: number; coinsCollected: number; crashedBy: string },
+    crashedBy: string
+  ): Promise<void> {
+    if (!this.controller) {
+      return;
+    }
+
     try {
-      this.lastSummary = await this.controller.finishRun({
-        distance: Math.floor(this.runState.distance),
-        coinsCollected: this.runState.coinsCollected,
-        crashedBy
-      });
+      const summary = await this.controller.finishRun(input);
       this.savedCoinBank = this.controller.getSnapshot().coins;
-      this.runState.finished = true;
-      this.phase = 'result';
-      this.resultPanel && (this.resultPanel.active = true);
-      this.homePanel && (this.homePanel.active = false);
-      this.rankPanel && (this.rankPanel.active = false);
-      this.noticePanel && (this.noticePanel.active = false);
-      this.hudPanelRoot && (this.hudPanelRoot.active = true);
 
-      if (this.resultTitleLabel) {
-        this.resultTitleLabel.string = '本局结束';
+      if (this.phase === 'result' && this.runState?.finished && this.lastSummary?.distance === input.distance) {
+        this.lastSummary = summary;
+        this.renderResultInfo(crashedBy);
+        this.updateResultButtons();
       }
-
-      this.audioDirector.playCrash();
-      this.audioDirector.setBgmMode('result');
-      this.renderResultInfo(crashedBy);
-      this.updateResultButtons();
-      this.renderHud();
-      this.renderHint();
-    } finally {
-      this.busy = false;
+    } catch (error) {
+      if (this.phase === 'result') {
+        this.showResultNotice(`结算同步失败：${this.formatErrorMessage(error)}`);
+      }
     }
   }
 
   private async reviveRun(): Promise<void> {
-    if (!this.controller || !this.runState || !this.runState.finished || this.runState.reviveUsed) {
+    if (this.busy || !this.controller || !this.runState || !this.runState.finished || this.runState.reviveUsed) {
       return;
     }
 
@@ -1233,18 +1307,25 @@ export class SkiEndlessGameScene extends Component {
       this.audioDirector.setBgmMode('run');
       this.renderHud();
       this.renderHint();
+    } catch (error) {
+      this.showResultNotice(`复活失败：${this.formatErrorMessage(error)}`);
     } finally {
       this.busy = false;
     }
   }
 
   private async claimDoubleCoins(): Promise<void> {
-    if (!this.controller || !this.lastSummary || !this.runState || this.runState.doubleClaimed) {
+    if (this.busy || !this.controller || !this.lastSummary || !this.runState || this.runState.doubleClaimed) {
       return;
     }
 
     this.busy = true;
     try {
+      if (this.lastSummary.coinsCollected <= 0) {
+        this.showResultNotice('本局没有获得金币，不能领取双倍奖励。');
+        return;
+      }
+
       const reward = await this.controller.claimDoubleCoinReward(this.lastSummary.coinsCollected);
       this.runState.doubleClaimed = true;
       this.savedCoinBank = reward.balanceAfter;
@@ -1260,13 +1341,15 @@ export class SkiEndlessGameScene extends Component {
           `当前余额：${String(reward.balanceAfter)}`
         ].join('\n'));
       this.updateResultButtons();
+    } catch (error) {
+      this.showResultNotice(`双倍金币失败：${this.formatErrorMessage(error)}`);
     } finally {
       this.busy = false;
     }
   }
 
   private updateTrackVisuals(deltaTime: number): void {
-    if (!this.runState || this.phase === 'home') {
+    if (!this.runState || this.phase !== 'running') {
       return;
     }
 
@@ -1413,6 +1496,19 @@ export class SkiEndlessGameScene extends Component {
     this.toastVisibleUntil = this.animationClock + duration;
   }
 
+  private showResultNotice(message: string): void {
+    if (this.phase === 'result' && this.resultInfoLabel) {
+      this.resultInfoLabel.string = [
+        this.resultInfoLabel.string,
+        '',
+        message
+      ].join('\n');
+      return;
+    }
+
+    this.showStatusToast(message, 1.8);
+  }
+
   private updateTransientToast(): void {
     if (!this.resultLabel) {
       return;
@@ -1496,9 +1592,9 @@ export class SkiEndlessGameScene extends Component {
     this.skierNode.angle = this.skierVisualAngle;
   }
 
-  private tryHandleButtons(location: Vec2, buttons: UIButton[]): boolean {
+  private tryHandleButtons(location: TouchLocation, buttons: UIButton[]): boolean {
     for (const button of buttons) {
-      if (!button.enabled || !button.node.active) {
+      if (!button.node.activeInHierarchy) {
         continue;
       }
 
@@ -1507,14 +1603,51 @@ export class SkiEndlessGameScene extends Component {
         continue;
       }
 
-      const rect = transform.getBoundingBoxToWorld();
-      if (rect.contains(location)) {
+      const size = transform.contentSize;
+      const center = this.getCanvasNodePosition(button.node);
+      const hitPadding = 34;
+      const halfWidth = size.width / 2 + hitPadding;
+      const halfHeight = size.height / 2 + hitPadding;
+      const worldRect = transform.getBoundingBoxToWorld();
+      const isCanvasHit =
+        location.canvas.x >= center.x - halfWidth &&
+        location.canvas.x <= center.x + halfWidth &&
+        location.canvas.y >= center.y - halfHeight &&
+        location.canvas.y <= center.y + halfHeight;
+      const isWorldHit =
+        location.ui.x >= worldRect.x - hitPadding &&
+        location.ui.x <= worldRect.x + worldRect.width + hitPadding &&
+        location.ui.y >= worldRect.y - hitPadding &&
+        location.ui.y <= worldRect.y + worldRect.height + hitPadding;
+
+      if (isCanvasHit || isWorldHit) {
+        if (!button.enabled) {
+          this.handleDisabledButtonTap(button.id);
+          return true;
+        }
+
         this.handleButtonAction(button.id);
         return true;
       }
     }
 
     return false;
+  }
+
+  private handleDisabledButtonTap(action: ButtonActionId): void {
+    this.audioDirector.playButton();
+
+    switch (action) {
+      case 'revive':
+        this.showResultNotice('本局已使用过复活，不能再次复活。');
+        return;
+      case 'double_coin':
+        this.showResultNotice('本局没有可翻倍的金币。');
+        return;
+      default:
+        this.showStatusToast('当前按钮暂不可用。', 1.2);
+        return;
+    }
   }
 
   private handleButtonAction(action: ButtonActionId): void {
@@ -1835,6 +1968,19 @@ export class SkiEndlessGameScene extends Component {
   private formatErrorMessage(error: unknown): string {
     if (error instanceof Error && error.message.trim() !== '') {
       return error.message;
+    }
+
+    if (error && typeof error === 'object' && 'errMsg' in error) {
+      return String((error as { errMsg?: unknown }).errMsg);
+    }
+
+    try {
+      const serialized = JSON.stringify(error);
+      if (serialized && serialized !== '{}') {
+        return serialized;
+      }
+    } catch {
+      // Keep the fallback below for non-serializable platform errors.
     }
 
     return '未知错误';

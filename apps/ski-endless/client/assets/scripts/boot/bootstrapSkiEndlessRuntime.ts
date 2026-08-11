@@ -57,7 +57,8 @@ export async function bootstrapSkiEndlessRuntime(
   const useWechat = options.platformOverride === 'wechat' || (options.platformOverride !== 'web' && isWechatMiniGameRuntime());
   const platform = useWechat
     ? new WechatPlatformAdapter({
-        rewardedVideoAdUnitIds: skiEndlessPlatformConfig.wechat.rewardedVideoAdUnitIds
+        rewardedVideoAdUnitIds: skiEndlessPlatformConfig.wechat.rewardedVideoAdUnitIds,
+        allowMockRewardedVideoOnInvalidAdUnitId: true
       })
     : new WebMockPlatformAdapter();
   const network = createNetworkManager();
