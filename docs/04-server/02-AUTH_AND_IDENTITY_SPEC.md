@@ -72,6 +72,12 @@ POST /api/auth/login
 5. 生成只对当前游戏有效的 token
 6. 返回用户基础信息与登录结果
 
+### 当前实现边界
+
+当前 `api-server` 的登录实现仅将入参 `code` 作为本地联调身份键，适用于浏览器样例、自动化验证和没有平台密钥的开发环境。它**不是**微信正式身份认证：微信的 `wx.login()` `code` 是短期一次性凭证，不能直接存入 `platform_open_id`，否则同一玩家在后续登录时可能被创建成多个用户。
+
+微信正式发布前必须在服务端增加独立的身份解析器：使用仅保存在部署 Secrets 中的 AppSecret 调用微信的 code 换 session 流程，得到稳定的 `openid`（以及需要时的会话信息）后，再传入 `game_user` 查询或创建逻辑。AppSecret 不属于 Cocos 客户端、本地配置模板或 Git 仓库。
+
 ## 5. token 约束
 
 token 中建议至少包含：

@@ -100,6 +100,10 @@ Cocos Creator 会在本机生成引擎类型声明和 `temp/` 目录，它们不
 
 不应该。`SkiEndlessPlatformConfig.local.ts`、`.env` 和 Cocos 本机文件都被忽略。只提交 `*.example.*` 模板，真实 API 地址、AppID、广告位、密码和令牌必须留在本机或部署平台的 Variables / Secrets 中。
 
+### 微信登录现在可以直接用于正式发布吗？
+
+不可以。当前 API 的 `code` 身份处理只用于本地和自动化联调；正式微信登录必须在服务端用 AppSecret 将 `wx.login()` 的短期 code 换成稳定 openid。该身份解析器是路线图中的发布前置条件，不能把 AppSecret 放入 Cocos 客户端或 Git 仓库。
+
 ### 为什么部署工作流显示为跳过？
 
 公开 CI 与私有部署分开。未配置所有部署 Variables 的 fork 或开源克隆会安全跳过部署；这不影响 `Validate` 对构建和核心链路的验证。
