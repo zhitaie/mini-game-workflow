@@ -9,6 +9,8 @@ export interface SkiEndlessPlatformConfig {
     // Keep only runtime fields here.
     apiBaseURL: string;
     rewardedVideoAdUnitIds: Record<string, string>;
+    // Enable only for a deliberate local platform integration check.
+    allowMockRewardedVideoOnInvalidAdUnitId?: boolean;
   };
 }
 

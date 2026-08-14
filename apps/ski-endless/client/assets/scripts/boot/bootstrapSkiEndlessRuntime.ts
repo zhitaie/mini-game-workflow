@@ -63,7 +63,8 @@ export async function bootstrapSkiEndlessRuntime(
   const platform = useWechat
     ? new WechatPlatformAdapter({
         rewardedVideoAdUnitIds: skiEndlessPlatformConfig.wechat.rewardedVideoAdUnitIds,
-        allowMockRewardedVideoOnInvalidAdUnitId: true
+        allowMockRewardedVideoOnInvalidAdUnitId:
+          skiEndlessPlatformConfig.wechat.allowMockRewardedVideoOnInvalidAdUnitId === true
       })
     : new WebMockPlatformAdapter();
   const network = createNetworkManager();

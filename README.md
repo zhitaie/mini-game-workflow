@@ -72,7 +72,7 @@ npm run dev:stack
 npm run build:with-cocos
 ```
 
-`npm run setup:ski-local-config` 会在缺失时从公开示例生成本机配置文件。请在生成的 `SkiEndlessPlatformConfig.local.ts` 中填写自己的 API 地址和广告位；它已被 Git 忽略，不能提交真实 AppID、域名或广告位 ID。
+`npm run setup:ski-local-config` 会在缺失时从公开示例生成本机配置文件。请在生成的 `SkiEndlessPlatformConfig.local.ts` 中填写自己的 API 地址和广告位；它已被 Git 忽略，不能提交真实 AppID、域名或广告位 ID。未配置广告位时，微信运行时默认拒绝发放奖励；只有明确将 `allowMockRewardedVideoOnInvalidAdUnitId` 设为 `true` 才会启用本机联调用的模拟广告，绝不能随正式包发布。
 
 ## 验证
 

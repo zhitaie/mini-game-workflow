@@ -9,6 +9,7 @@ export const skiEndlessPlatformConfigLocal: SkiEndlessPlatformConfig = {
     rewardedVideoAdUnitIds: {
       ski_revive: 'replace-with-wechat-revive-ad-unit-id',
       ski_double_coin: 'replace-with-wechat-double-coin-ad-unit-id'
-    }
+    },
+    allowMockRewardedVideoOnInvalidAdUnitId: false
   }
 };
