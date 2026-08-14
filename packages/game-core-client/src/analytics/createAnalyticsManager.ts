@@ -35,7 +35,8 @@ export function createAnalyticsManager(network: NetworkManager): AnalyticsManage
         return;
       }
 
-      const payload = queue.splice(0, queue.length);
+      const payload = queue.slice();
+
       await network.request({
         path: '/api/analytics/events',
         method: 'POST',
@@ -49,6 +50,8 @@ export function createAnalyticsManager(network: NetworkManager): AnalyticsManage
         }
       });
 
+      // Remove only the batch that was accepted. Events queued while sending stay pending.
+      queue.splice(0, payload.length);
     }
   };
 }

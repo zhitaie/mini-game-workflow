@@ -6,6 +6,7 @@ const ROOT_DIR = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const VERIFICATION_SCRIPTS = [
   'verify:minimal',
   'verify:save-migration',
+  'verify:analytics-retry',
   'verify:http',
   'verify:sample-browser',
   'verify:dev-stack',
