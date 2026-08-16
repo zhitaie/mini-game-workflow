@@ -1,5 +1,7 @@
 # mini-game-workflow
 
+[English](README.en.md) | 中文
+
 ![mini-game-workflow social preview](docs/images/open-source-social-preview.png)
 
 一个面向多款小游戏复用的 TypeScript monorepo：共享游戏协议与客户端能力、可替换的 API 服务、管理端壳，以及基于 Cocos Creator 的滑雪样例游戏。
