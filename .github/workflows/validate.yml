@@ -34,3 +34,59 @@ jobs:
 
       - name: Verify public contracts and admin flows
         run: npm run verify:ci
+
+  docker-smoke:
+    needs: build-and-verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+
+      - name: Build the production API image
+        run: docker build --tag mini-game-workflow-api:ci .
+
+      - name: Start and verify the production API image
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          container_name="mini-game-workflow-api-smoke"
+          port="38080"
+
+          cleanup() {
+            docker logs "$container_name" || true
+            docker rm --force "$container_name" || true
+          }
+          trap cleanup EXIT
+
+          mkdir -p "$RUNNER_TEMP/mini-game-workflow-api-data"
+          docker run --detach --rm \
+            --name "$container_name" \
+            --publish "127.0.0.1:${port}:3003" \
+            --volume "$RUNNER_TEMP/mini-game-workflow-api-data:/data" \
+            --env NODE_ENV=production \
+            --env API_HOST=0.0.0.0 \
+            --env API_PORT=3003 \
+            --env API_DB_FILE=/data/mini-game-workflow.sqlite \
+            --env MINI_GAME_WORKFLOW_TOKEN_SECRET=ci-token-secret \
+            --env MINI_GAME_WORKFLOW_ADMIN_PASSWORD_SECRET=ci-admin-password-secret \
+            --env MINI_GAME_WORKFLOW_ADMIN_SESSION_SECRET=ci-admin-session-secret \
+            --env MINI_GAME_WORKFLOW_ADMIN_BOOTSTRAP_PASSWORD=ci-bootstrap-password \
+            mini-game-workflow-api:ci
+
+          for attempt in {1..20}; do
+            if health="$(curl --fail --silent "http://127.0.0.1:${port}/health")"; then
+              node --input-type=module --eval '
+                const health = JSON.parse(process.argv[1]);
+                if (health.ok !== true || health.name !== "api-server") {
+                  throw new Error(`Unexpected container health response: ${JSON.stringify(health)}`);
+                }
+              ' "$health"
+              exit 0
+            fi
+            sleep 1
+          done
+
+          echo "Container health check did not succeed"
+          exit 1
