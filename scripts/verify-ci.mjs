@@ -7,6 +7,7 @@ const VERIFICATION_SCRIPTS = [
   'verify:minimal',
   'verify:save-migration',
   'verify:analytics-retry',
+  'verify:wechat-platform',
   'verify:http',
   'verify:sample-browser',
   'verify:dev-stack',
