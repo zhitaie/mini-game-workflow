@@ -5,6 +5,7 @@ import type { NetworkManager } from '../network/NetworkManager.js';
 export function createAnalyticsManager(network: NetworkManager): AnalyticsManager {
   let context: AnalyticsContext | null = null;
   const queue: AnalyticsEventInput[] = [];
+  let pendingFlush: Promise<void> | null = null;
 
   return {
     init(nextContext: AnalyticsContext): void {
@@ -31,27 +32,48 @@ export function createAnalyticsManager(network: NetworkManager): AnalyticsManage
         throw new Error('AnalyticsManager has not been initialized.');
       }
 
+      if (pendingFlush) {
+        await pendingFlush;
+        return;
+      }
+
       if (queue.length === 0) {
         return;
       }
 
-      const payload = queue.slice();
+      const activeContext = context;
+      const flushQueue = async (): Promise<void> => {
+        while (queue.length > 0) {
+          const payload = queue.slice();
 
-      await network.request({
-        path: '/api/analytics/events',
-        method: 'POST',
-        requiresAuth: true,
-        body: {
-          gameKey: context.gameKey,
-          platform: context.platform,
-          clientVersion: context.clientVersion,
-          sessionId: context.sessionId,
-          events: payload
+          await network.request({
+            path: '/api/analytics/events',
+            method: 'POST',
+            requiresAuth: true,
+            body: {
+              gameKey: activeContext.gameKey,
+              platform: activeContext.platform,
+              clientVersion: activeContext.clientVersion,
+              sessionId: activeContext.sessionId,
+              events: payload
+            }
+          });
+
+          // Remove only the batch that was accepted. Events queued while sending stay pending.
+          queue.splice(0, payload.length);
         }
-      });
+      };
 
-      // Remove only the batch that was accepted. Events queued while sending stay pending.
-      queue.splice(0, payload.length);
+      const flushPromise = flushQueue();
+      pendingFlush = flushPromise;
+
+      try {
+        await flushPromise;
+      } finally {
+        if (pendingFlush === flushPromise) {
+          pendingFlush = null;
+        }
+      }
     }
   };
 }

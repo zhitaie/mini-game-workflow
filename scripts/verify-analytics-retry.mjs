@@ -48,4 +48,44 @@ if (
   throw new Error(`Expected retry to preserve both events: ${JSON.stringify(sentBatches)}`);
 }
 
-console.log(JSON.stringify({ requestCount, retryBatch }, null, 2));
+const concurrentBatches = [];
+const deliveryResolvers = [];
+const concurrentAnalytics = createAnalyticsManager({
+  request(options) {
+    concurrentBatches.push(options.body.events);
+    return new Promise((resolve) => {
+      deliveryResolvers.push(resolve);
+    });
+  }
+});
+
+concurrentAnalytics.init({
+  gameKey: 'game_sample',
+  platform: 'web',
+  clientVersion: '0.1.0',
+  sessionId: 'verify-analytics-concurrency'
+});
+concurrentAnalytics.track({ eventName: 'concurrent-first' });
+
+const firstFlush = concurrentAnalytics.flush();
+const secondFlush = concurrentAnalytics.flush();
+if (concurrentBatches.length !== 1 || concurrentBatches[0]?.[0]?.eventName !== 'concurrent-first') {
+  throw new Error(`Expected concurrent flushes to share one first delivery: ${JSON.stringify(concurrentBatches)}`);
+}
+
+concurrentAnalytics.track({ eventName: 'queued-during-delivery' });
+deliveryResolvers[0]();
+await new Promise((resolve) => setImmediate(resolve));
+
+if (
+  concurrentBatches.length !== 2 ||
+  concurrentBatches[1]?.length !== 1 ||
+  concurrentBatches[1]?.[0]?.eventName !== 'queued-during-delivery'
+) {
+  throw new Error(`Expected queued event to be delivered once after the active batch: ${JSON.stringify(concurrentBatches)}`);
+}
+
+deliveryResolvers[1]();
+await Promise.all([firstFlush, secondFlush]);
+
+console.log(JSON.stringify({ requestCount, retryBatch, concurrentBatches }, null, 2));
