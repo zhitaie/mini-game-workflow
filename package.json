@@ -25,6 +25,7 @@
     "verify:save-migration": "node --experimental-specifier-resolution=node scripts/verify-save-manager-migration.mjs",
     "verify:analytics-retry": "node --experimental-specifier-resolution=node scripts/verify-analytics-retry.mjs",
     "verify:wechat-platform": "node --experimental-specifier-resolution=node scripts/verify-wechat-platform-adapter.mjs",
+    "verify:ski-game-contract": "node --experimental-specifier-resolution=node scripts/verify-ski-game-contract.mjs",
     "verify:minimal": "node --experimental-specifier-resolution=node scripts/verify-minimal-flow.mjs",
     "verify:admin": "node --experimental-specifier-resolution=node scripts/verify-admin-flow.mjs",
     "verify:admin-authz": "node --experimental-specifier-resolution=node scripts/verify-admin-authz.mjs",

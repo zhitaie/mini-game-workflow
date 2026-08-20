@@ -8,6 +8,7 @@ const VERIFICATION_SCRIPTS = [
   'verify:save-migration',
   'verify:analytics-retry',
   'verify:wechat-platform',
+  'verify:ski-game-contract',
   'verify:http',
   'verify:sample-browser',
   'verify:dev-stack',
