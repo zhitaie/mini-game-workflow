@@ -23,6 +23,7 @@
     "verify:http": "node --experimental-specifier-resolution=node scripts/verify-http-server.mjs",
     "verify:sample-browser": "node --experimental-specifier-resolution=node scripts/verify-game-sample-browser.mjs",
     "verify:save-migration": "node --experimental-specifier-resolution=node scripts/verify-save-manager-migration.mjs",
+    "verify:config-manager": "node --experimental-specifier-resolution=node scripts/verify-config-manager.mjs",
     "verify:analytics-retry": "node --experimental-specifier-resolution=node scripts/verify-analytics-retry.mjs",
     "verify:wechat-platform": "node --experimental-specifier-resolution=node scripts/verify-wechat-platform-adapter.mjs",
     "verify:ski-game-contract": "node --experimental-specifier-resolution=node scripts/verify-ski-game-contract.mjs",
